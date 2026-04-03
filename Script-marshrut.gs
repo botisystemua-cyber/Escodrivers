@@ -683,14 +683,14 @@ function handleUpdateDriverFields(data) {
       return String(h).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
     });
 
-    // Шукаємо рядок: для Відправка по DISPATCH_ID (col A), для Маршрут по ITEM_ID (col E)
+    // Шукаємо рядок: для Відправка по DISPATCH_ID (col A), для Маршрут по RTE_ID (col A)
     var allData = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
     var rowNum = -1;
     for (var i = 0; i < allData.length; i++) {
       if (isShipping) {
         if (str(allData[i][COL_SHIP.DISPATCH_ID]) === str(itemId)) { rowNum = i + 2; break; }
       } else {
-        if (str(allData[i][COL.ITEM_ID]) === str(itemId) || str(allData[i][COL.RTE_ID]) === str(itemId)) { rowNum = i + 2; break; }
+        if (str(allData[i][COL.RTE_ID]) === str(itemId)) { rowNum = i + 2; break; }
       }
     }
     if (rowNum === -1) return { success: false, error: 'Запис не знайдено: ' + itemId };
