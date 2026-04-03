@@ -104,11 +104,13 @@ export function ListScreen() {
       }
 
       await Promise.all(tasks);
-      if (tab === 'all') showToast('Завантажено усе');
-      else if (tab === 'passengers') showToast('Завантажено пасажирів');
-      else if (tab === 'packages') showToast('Завантажено посилок');
-      else if (tab === 'shipping') showToast('Відправлення завантажено');
-      else if (tab === 'allPackages') showToast('Завантажено посилки та відправлення');
+      if (force) {
+        if (tab === 'all') showToast('Завантажено усе');
+        else if (tab === 'passengers') showToast('Завантажено пасажирів');
+        else if (tab === 'packages') showToast('Завантажено посилок');
+        else if (tab === 'shipping') showToast('Відправлення завантажено');
+        else if (tab === 'allPackages') showToast('Завантажено посилки та відправлення');
+      }
     } catch (err) { showToast('Помилка: ' + (err as Error).message); }
     finally { setLoading(false); }
   }, [currentSheet, isUnifiedView, shippingSheetName, loadedTabs, routes, shippingRoutes, setStatus, showToast]);
