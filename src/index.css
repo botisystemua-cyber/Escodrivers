@@ -27,35 +27,83 @@
   }
 
   /* ---- Dark theme overrides ---- */
+  /* 3 рівні глибини: bg #111318 → card #1c1f2b → element #272b3a */
   html.dark {
-    --color-bg: #0f1117;
-    --color-card: #1a1d27;
-    --color-text: #e5e7eb;
-    --color-text-secondary: #9ca3af;
-    --color-border: #2d3140;
-    --color-muted: #6b7280;
-    --color-brand-light: #0a2614;
+    --color-bg: #111318;
+    --color-card: #1c1f2b;
+    --color-text: #e8eaed;
+    --color-text-secondary: #a0a4b2;
+    --color-border: #2e3348;
+    --color-muted: #737891;
+    --color-brand-light: #132b1a;
     color-scheme: dark;
   }
 
-  html.dark .bg-white { background-color: #1a1d27 !important; }
-  html.dark .bg-gray-50 { background-color: #1e2130 !important; }
-  html.dark .bg-gray-100 { background-color: #252836 !important; }
-  html.dark .bg-gray-300 { background-color: #3b3f50 !important; }
-  html.dark .bg-gray-800 { background-color: #e5e7eb !important; color: #111827 !important; }
-  html.dark .text-gray-400 { color: #6b7280 !important; }
-  html.dark .text-gray-500 { color: #8b8fa0 !important; }
-  html.dark .text-gray-600 { color: #9ca3af !important; }
-  html.dark .border-gray-100 { border-color: #2d3140 !important; }
-  html.dark .border-gray-200 { border-color: #2d3140 !important; }
-  html.dark .border-gray-300 { border-color: #3b3f50 !important; }
-  html.dark .text-white { color: #ffffff !important; }
-  html.dark .placeholder\:text-gray-300::placeholder { color: #4b5060 !important; }
-  html.dark .hover\:bg-gray-100:hover { background-color: #252836 !important; }
-  html.dark .hover\:bg-gray-200:hover { background-color: #2d3140 !important; }
-  html.dark .hover\:bg-red-50:hover { background-color: #2a1215 !important; }
-  html.dark .bg-gray-50\/50 { background-color: rgba(30, 33, 48, 0.5) !important; }
-  html.dark input, html.dark textarea, html.dark select { background-color: #1e2130; color: #e5e7eb; }
+  /* Рівень 1 — панелі/хедери (card level) */
+  html.dark .bg-white { background-color: #1c1f2b !important; }
+
+  /* Рівень 2 — елементи всередині карток */
+  html.dark .bg-gray-50 { background-color: #242838 !important; }
+  html.dark .bg-gray-100 { background-color: #2a2f42 !important; }
+  html.dark .bg-gray-300 { background-color: #3d4359 !important; }
+  html.dark .bg-gray-50\/50 { background-color: rgba(36, 40, 56, 0.6) !important; }
+
+  /* Toast — інвертований */
+  html.dark .bg-gray-800 { background-color: #e8eaed !important; color: #111318 !important; }
+
+  /* Тексти — м'які сірі відтінки */
+  html.dark .text-gray-300 { color: #505672 !important; }
+  html.dark .text-gray-400 { color: #737891 !important; }
+  html.dark .text-gray-500 { color: #8b90a5 !important; }
+  html.dark .text-gray-600 { color: #a0a4b2 !important; }
+
+  /* Бордери — ледь помітні */
+  html.dark .border-gray-100 { border-color: #272b3a !important; }
+  html.dark .border-gray-200 { border-color: #2e3348 !important; }
+  html.dark .border-gray-300 { border-color: #3d4359 !important; }
+
+  /* Плейсхолдери */
+  html.dark .placeholder\:text-gray-300::placeholder { color: #505672 !important; }
+
+  /* Ховери — м'яке підсвічування */
+  html.dark .hover\:bg-gray-100:hover { background-color: #2a2f42 !important; }
+  html.dark .hover\:bg-gray-200:hover { background-color: #323752 !important; }
+  html.dark .hover\:bg-red-50:hover { background-color: #2d1a1e !important; }
+
+  /* Інпути — виділяються від фону */
+  html.dark input, html.dark textarea, html.dark select {
+    background-color: #242838 !important;
+    color: #e8eaed !important;
+    border-color: #2e3348 !important;
+  }
+  html.dark input:focus, html.dark textarea:focus, html.dark select:focus {
+    border-color: #22c55e !important;
+  }
+
+  /* Тіні — прибрати або зробити м'якими */
+  html.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important; }
+  html.dark .shadow-xl { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4) !important; }
+  html.dark .shadow-2xl { box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5) !important; }
+  html.dark .shadow-\[0_2px_8px_rgba\(0\,0\,0\,0\.06\)\] { box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important; }
+  html.dark .shadow-md { box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important; }
+
+  /* Статусні кольори — приглушені */
+  html.dark .bg-green-50 { background-color: rgba(34, 197, 94, 0.12) !important; }
+  html.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.12) !important; }
+  html.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.12) !important; }
+  html.dark .text-green-700 { color: #4ade80 !important; }
+  html.dark .text-blue-700 { color: #60a5fa !important; }
+  html.dark .text-red-700 { color: #f87171 !important; }
+
+  /* Бренд на темному */
+  html.dark .bg-brand\/10 { background-color: rgba(34, 197, 94, 0.12) !important; }
+  html.dark .bg-brand\/10:hover { background-color: rgba(34, 197, 94, 0.18) !important; }
+  html.dark .border-brand\/30 { border-color: rgba(34, 197, 94, 0.25) !important; }
+  html.dark .text-brand\/60 { color: rgba(34, 197, 94, 0.7) !important; }
+
+  /* Модальний оверлей */
+  html.dark .bg-black\/40 { background-color: rgba(0, 0, 0, 0.6) !important; }
+  html.dark .bg-black\/50 { background-color: rgba(0, 0, 0, 0.65) !important; }
 }
 
 @keyframes slideUp {
