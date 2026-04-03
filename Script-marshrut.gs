@@ -302,7 +302,7 @@ function readRouteByType_(sheetName, typeFilter) {
   for (var i = 0; i < data.length; i++) {
     var row = data[i];
     var type = str(row[COL.TYPE]).toLowerCase();
-    if (type !== typeFilter) continue;
+    if (type.indexOf(typeFilter) === -1) continue;
 
     var itemId = str(row[COL.ITEM_ID]);
     if (!itemId) continue;
