@@ -126,6 +126,13 @@
   html.dark .text-amber-400 { color: #b89840 !important; }
   html.dark .text-yellow-400 { color: #b89840 !important; }
 
+  /* Активні таби/піли — приглушені */
+  html.dark .bg-blue-500 { background-color: #2a5580 !important; }
+  html.dark .bg-emerald-500 { background-color: #1f6b48 !important; }
+  html.dark .bg-red-500 { background-color: #8a3a3a !important; }
+  html.dark .bg-brand { background-color: #1a7a40 !important; }
+  html.dark .bg-gray-800 { background-color: #2a3a4d !important; color: #dfe3e8 !important; }
+
   /* --- Бренд --- */
   html.dark .bg-brand\/10 { background-color: rgba(34, 197, 94, 0.08) !important; }
   html.dark .border-brand\/30 { border-color: rgba(34, 197, 94, 0.18) !important; }
