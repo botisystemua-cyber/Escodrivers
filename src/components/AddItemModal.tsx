@@ -86,7 +86,7 @@ export function AddItemModal({ onClose, onAdded }: Props) {
 
       const result = await addRouteItem(data);
       if (result.success) {
-        showToast(result.message || 'Додано!');
+        showToast((result.message as string) || 'Додано!');
         onAdded();
         onClose();
       } else {
