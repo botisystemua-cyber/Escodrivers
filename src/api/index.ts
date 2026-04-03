@@ -2,57 +2,17 @@ import { CONFIG } from '../config';
 import type { Route, ShippingRoute, Passenger, Package, ShippingItem, RouteItem, ExpenseItem, ExpenseAdvance } from '../types';
 
 // ============================================
-// Читання через Google Sheets gviz API (публічна таблиця)
-// Це НАБАГАТО швидше ніж Apps Script
+// Читання через Apps Script (таблиця не публічна)
+// Apps Script має доступ до таблиці від імені власника
 // ============================================
 
 async function fetchSheet(sheetName: string): Promise<string[][]> {
-  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-  const response = await fetch(url);
+  const response = await fetch(CONFIG.API_URL + '?action=getSheetData&sheet=' + encodeURIComponent(sheetName));
   if (!response.ok) throw new Error('Не вдалося завантажити: ' + sheetName);
-  const csv = await response.text();
-  return parseCsv(csv);
-}
-
-function parseCsv(csv: string): string[][] {
-  const rows: string[][] = [];
-  let current = '';
-  let inQuotes = false;
-  let row: string[] = [];
-
-  for (let i = 0; i < csv.length; i++) {
-    const ch = csv[i];
-    if (inQuotes) {
-      if (ch === '"' && csv[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ',') {
-        row.push(current);
-        current = '';
-      } else if (ch === '\n' || (ch === '\r' && csv[i + 1] === '\n')) {
-        row.push(current);
-        current = '';
-        if (row.some((c) => c.trim())) rows.push(row);
-        row = [];
-        if (ch === '\r') i++;
-      } else {
-        current += ch;
-      }
-    }
-  }
-  if (current || row.length) {
-    row.push(current);
-    if (row.some((c) => c.trim())) rows.push(row);
-  }
-  return rows;
+  const text = await response.text();
+  const data = JSON.parse(text);
+  if (!data.success) throw new Error(data.error || 'Помилка завантаження: ' + sheetName);
+  return data.rows;
 }
 
 // Column indices for Маршрут sheets (matching .gs COL)

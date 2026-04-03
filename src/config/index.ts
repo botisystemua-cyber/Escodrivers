@@ -1,8 +1,6 @@
 export const CONFIG = {
   COMPANY_NAME: 'EscoExpress',
-  // Google Sheets ID для прямого читання через gviz API
-  SPREADSHEET_ID: '10SZhKV08BJyvWoMwhT0iddtWzYrDYFjCM8xgqViuE3Y',
-  // Apps Script — тільки для запису (updateDriverStatus)
+  // Apps Script — читання і запис (таблиця непублічна)
   API_URL:
     'https://script.google.com/macros/s/AKfycbwJNYzbhht2y4xBdA5nNfHEyC2hxpUaNrb1ikD9HOf-owpcoCS1jm_T0rJDgF8qkcQhjg/exec',
   // Маршрути (hardcoded)
