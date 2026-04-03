@@ -1,7 +1,7 @@
 // ============================================
-// BOTILOGISTICS DRIVERS CRM v2.0
-// Єдиний Apps Script для таблиці Marhrut_Test
-// ID: 1Ku__ll0kDvp5dCeaS6QdnHrGGeoic-rykib6N1L7jeQ
+// ESCOEXPRESS DRIVERS CRM v2.0
+// Єдиний Apps Script для таблиці Marshrut
+// ID: 10SZhKV08BJyvWoMwhT0iddtWzYrDYFjCM8xgqViuE3Y
 // ============================================
 //
 // СТРУКТУРА:
@@ -12,7 +12,7 @@
 //   Зведення рейсів — зведення, ігнорується
 // ============================================
 
-var SPREADSHEET_ID = '1Ku__ll0kDvp5dCeaS6QdnHrGGeoic-rykib6N1L7jeQ';
+var SPREADSHEET_ID = '10SZhKV08BJyvWoMwhT0iddtWzYrDYFjCM8xgqViuE3Y';
 var SHEET_LOGS = 'Логи водіїв';
 
 var STATUS_COLORS = {
@@ -161,7 +161,7 @@ function doGet(e) {
 
     switch (action) {
       case 'health':
-        return respond({ success: true, version: '2.0', service: 'BotiLogistics Drivers CRM', timestamp: new Date().toISOString() });
+        return respond({ success: true, version: '2.0', service: 'EscoExpress Drivers CRM', timestamp: new Date().toISOString() });
       case 'getAvailableRoutes':
         return respond(getAvailableRoutes());
       case 'getPassengers':
@@ -963,7 +963,7 @@ function respond(data) {
 }
 
 function onOpen() {
-  SpreadsheetApp.getUi().createMenu('BotiLogistics CRM')
+  SpreadsheetApp.getUi().createMenu('EscoExpress CRM')
     .addItem('Список маршрутів', 'menuRoutes')
     .addToUi();
 }
