@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { LogIn, Truck } from 'lucide-react';
-import { BotiLogo } from './BotiLogo';
+import { EscoLogo } from './EscoLogo';
 import { useApp } from '../store/useAppStore';
 import { fetchRoutes } from '../api';
 
@@ -33,7 +33,7 @@ export function LoginScreen() {
         <Truck className="w-10 h-10 text-brand" strokeWidth={1.5} />
       </div>
 
-      <BotiLogo size="lg" />
+      <EscoLogo size="lg" />
       <p className="text-muted text-sm mt-1 mb-10">Панель водія</p>
 
       <div className="w-full max-w-sm">

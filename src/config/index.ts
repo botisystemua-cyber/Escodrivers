@@ -1,10 +1,10 @@
 export const CONFIG = {
-  COMPANY_NAME: 'BotiLogistics',
+  COMPANY_NAME: 'EscoExpress',
   // Google Sheets ID для прямого читання через gviz API
-  SPREADSHEET_ID: '1Ku__ll0kDvp5dCeaS6QdnHrGGeoic-rykib6N1L7jeQ',
+  SPREADSHEET_ID: '10SZhKV08BJyvWoMwhT0iddtWzYrDYFjCM8xgqViuE3Y',
   // Apps Script — тільки для запису (updateDriverStatus)
   API_URL:
-    'https://script.google.com/macros/s/AKfycby4ENpB0eUqvi58I8wnrCLXr3kSh0vclfIQwejcUsF6-8HIu_BLHHu70uONhMoy1NKNoQ/exec',
+    'https://script.google.com/macros/s/AKfycbwJNYzbhht2y4xBdA5nNfHEyC2hxpUaNrb1ikD9HOf-owpcoCS1jm_T0rJDgF8qkcQhjg/exec',
   // Маршрути (hardcoded)
   ROUTES: ['Маршрут_1', 'Маршрут_2', 'Маршрут_3'],
   SHIPPING: [
