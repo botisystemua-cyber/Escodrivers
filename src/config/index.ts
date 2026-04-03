@@ -2,7 +2,7 @@ export const CONFIG = {
   COMPANY_NAME: 'EscoExpress',
   // Apps Script — читання і запис (таблиця непублічна)
   API_URL:
-    'https://script.google.com/macros/s/AKfycbxqmw9ycUk6W1oHFtQTqTcQymjZ69SfldiNyGjnjmSnmJMG7HIK_PUnCH3myPeAg7OqHg/exec',
+    'https://script.google.com/macros/s/AKfycby2-Q8Utq--zo09MEu3dXRzKpnMGxmX_CDJnFO65rzOUvYi8ZrtPo8293voh8k8jm31sA/exec',
   // Маршрути (hardcoded)
   ROUTES: ['Маршрут_Цюріх', 'Маршрут_Женева', 'Маршрут_Запасний'],
   SHIPPING: [
