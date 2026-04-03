@@ -29,6 +29,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [shippingRoutes, setShippingRoutes] = useState<ShippingRoute[]>([]);
   const [toastMessage, setToastMessage] = useState('');
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(loadHiddenCols);
+  const [darkMode, setDarkMode] = useState(false);
 
   const setDriverName = useCallback((name: string) => {
     setDriverNameState(name);
@@ -68,6 +69,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToastMessage(''), 3000);
   }, []);
 
+  const toggleDarkMode = useCallback(() => {
+    setDarkMode((prev) => {
+      const next = !prev;
+      document.documentElement.classList.toggle('dark', next);
+      return next;
+    });
+  }, []);
+
   const toggleCol = useCallback((col: string) => {
     setHiddenCols((prev) => {
       const next = new Set(prev);
@@ -83,11 +92,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     statusFilter, setStatusFilter, routeFilter, setRouteFilter,
     viewTab, setViewTab, routes, setRoutes, shippingRoutes, setShippingRoutes,
     openRoute, goBack, toastMessage, showToast, hiddenCols, toggleCol,
+    darkMode, toggleDarkMode,
   }), [
     driverName, setDriverName, currentScreen, currentSheet,
     isUnifiedView, statuses, setStatus, getStatus,
     statusFilter, routeFilter, viewTab, routes, shippingRoutes,
     openRoute, goBack, toastMessage, showToast, hiddenCols, toggleCol,
+    darkMode, toggleDarkMode,
   ]);
 
   return <AppContext.Provider value={store}>{children}</AppContext.Provider>;

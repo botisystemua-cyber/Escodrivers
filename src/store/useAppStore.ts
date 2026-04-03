@@ -37,6 +37,9 @@ export interface AppStore {
 
   hiddenCols: Set<string>;
   toggleCol: (col: string) => void;
+
+  darkMode: boolean;
+  toggleDarkMode: () => void;
 }
 
 export const AppContext = createContext<AppStore | null>(null);
