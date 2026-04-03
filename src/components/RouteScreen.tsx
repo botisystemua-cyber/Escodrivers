@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Package, LogOut, ChevronRight, Layers, RefreshCw, User, Moon, Sun } from 'lucide-react';
+import { Package, ChevronRight, Layers, RefreshCw, User, Moon, Sun } from 'lucide-react';
 import { useApp } from '../store/useAppStore';
 import { fetchRoutes } from '../api';
 import { EscoLogo } from './EscoLogo';
 
 export function RouteScreen() {
-  const { driverName, setDriverName, setCurrentScreen, openRoute, routes, setRoutes, shippingRoutes, setShippingRoutes, darkMode, toggleDarkMode } = useApp();
+  const { openRoute, routes, setRoutes, shippingRoutes, setShippingRoutes, darkMode, toggleDarkMode } = useApp();
   const [loading, setLoading] = useState(false);
 
   const loadRoutes = async () => {
@@ -20,24 +20,14 @@ export function RouteScreen() {
 
   useEffect(() => { loadRoutes(); }, []);
 
-  const logout = () => { setDriverName(''); localStorage.removeItem('driverName'); setCurrentScreen('login'); };
-
   return (
     <div className="flex-1 flex flex-col bg-bg min-h-dvh">
       <div className="bg-white border-b border-border px-4 pt-6 pb-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <EscoLogo size="md" />
-            <div className="text-[11px] text-muted">{driverName}</div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={toggleDarkMode} className="p-2 rounded-xl hover:bg-gray-100 cursor-pointer active:scale-95 transition-all">
-              {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-muted" />}
-            </button>
-            <button onClick={logout} className="p-2 rounded-xl hover:bg-red-50 cursor-pointer active:scale-95 transition-all">
-              <LogOut className="w-5 h-5 text-red-400" />
-            </button>
-          </div>
+          <EscoLogo size="md" />
+          <button onClick={toggleDarkMode} className="p-2 rounded-xl hover:bg-gray-100 cursor-pointer active:scale-95 transition-all">
+            {darkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5 text-muted" />}
+          </button>
         </div>
       </div>
 

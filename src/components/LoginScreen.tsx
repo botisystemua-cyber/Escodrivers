@@ -24,7 +24,6 @@ export function LoginScreen() {
     if (!name) { showToast('Введи своє ім\'я'); return; }
     setDriverName(name);
     setCurrentScreen('routes');
-    showToast(`Привіт, ${name}!`);
   };
 
   return (
