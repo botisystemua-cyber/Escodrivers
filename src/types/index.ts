@@ -17,7 +17,7 @@ interface RouteItemBase {
   rteId: string;
   type: string;           // "Пасажир" | "Посилка"
   direction: string;
-  itemId: string;         // PAX_ID / PKG_ID
+  itemId: string;         // RTE_ID (col A) — унікальний ID запису
   dateCreated: string;
   dateTrip: string;
   timing: string;
