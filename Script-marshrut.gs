@@ -304,12 +304,12 @@ function readRouteByType_(sheetName, typeFilter) {
     var type = str(row[COL.TYPE]).toLowerCase();
     if (type.indexOf(typeFilter) === -1) continue;
 
-    var itemId = str(row[COL.ITEM_ID]);
+    var itemId = str(row[COL.RTE_ID]);
     if (!itemId) continue;
 
     var item = {
       rowNum: i + 2,
-      rteId: str(row[COL.RTE_ID]),
+      rteId: itemId,
       type: str(row[COL.TYPE]),
       direction: str(row[COL.DIRECTION]),
       itemId: itemId,
@@ -453,7 +453,7 @@ function handleDriverStatusUpdate(data) {
     // Валідація маршруту — дозволяємо Маршрут_* та Відправка_*
     var routeName = data.routeName || '';
     var isShipping = routeName.indexOf('Відправка_') === 0;
-    if (!routeName || (!isShipping && !/^Маршрут_\d+$/.test(routeName))) {
+    if (!routeName || (!isShipping && routeName.indexOf('Маршрут_') !== 0)) {
       return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
     }
 
@@ -492,8 +492,8 @@ function handleDriverStatusUpdate(data) {
     var rowsUpdated = 0;
     var targetId = str(data.itemId);
 
-    // Для Відправка шукаємо по DISPATCH_ID (col A), для Маршрут — по ITEM_ID (col E)
-    var idCol = isShipping ? COL_SHIP.DISPATCH_ID : COL.ITEM_ID;
+    // Для Відправка шукаємо по DISPATCH_ID (col A), для Маршрут — по RTE_ID (col A)
+    var idCol = isShipping ? COL_SHIP.DISPATCH_ID : COL.RTE_ID;
     var statusCol = isShipping ? COL_SHIP.STATUS : COL.STATUS;
     var noteCol = isShipping ? COL_SHIP.NOTE : COL.NOTE;
     var totalCols = isShipping ? TOTAL_COLS_SHIP : TOTAL_COLS;
@@ -606,9 +606,9 @@ function handleAddRouteItem(data) {
     var itemId = prefix + '_' + dateStr.replace(/-/g, '') + '_' + timeStr.replace(/:/g, '');
 
     var row = new Array(TOTAL_COLS).fill('');
+    row[COL.RTE_ID] = itemId;
     row[COL.TYPE] = itemType === 'пасажир' ? 'Пасажир' : 'Посилка';
     row[COL.DIRECTION] = data.direction || '';
-    row[COL.ITEM_ID] = itemId;
     row[COL.DATE_CREATED] = dateStr;
     row[COL.DATE_TRIP] = data.dateTrip || '';
     row[COL.DRIVER] = data.driverName || '';
