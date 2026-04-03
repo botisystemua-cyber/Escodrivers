@@ -540,7 +540,7 @@ function handleDriverStatusUpdate(data) {
 function handleAddRouteItem(data) {
   try {
     var routeName = data.routeName;
-    if (!routeName || !/^Маршрут_\d+$/.test(routeName)) {
+    if (!routeName || !/^Маршрут_.+$/.test(routeName)) {
       return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
     }
 
@@ -802,7 +802,7 @@ function getExpenses(sheetName) {
 function handleAddExpense(data) {
   try {
     var routeName = data.routeName;
-    if (!routeName || !/^Маршрут_\d+$/.test(routeName)) {
+    if (!routeName || !/^Маршрут_.+$/.test(routeName)) {
       return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
     }
 
@@ -859,7 +859,7 @@ function handleAddExpense(data) {
 function handleDeleteExpense(data) {
   try {
     var routeName = data.routeName;
-    if (!routeName || !/^Маршрут_\d+$/.test(routeName)) {
+    if (!routeName || !/^Маршрут_.+$/.test(routeName)) {
       return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
     }
 
