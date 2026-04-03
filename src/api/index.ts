@@ -8,7 +8,7 @@ import type { Route, ShippingRoute, Passenger, Package, ShippingItem, RouteItem,
 
 async function apGet(action: string, params: Record<string, string> = {}): Promise<Record<string, unknown>> {
   const query = new URLSearchParams({ action, ...params }).toString();
-  const response = await fetch(CONFIG.API_URL + '?' + query);
+  const response = await fetch(CONFIG.API_URL + '?' + query, { redirect: 'follow' });
   if (!response.ok) throw new Error('Помилка запиту: ' + action);
   const text = await response.text();
   return JSON.parse(text);
