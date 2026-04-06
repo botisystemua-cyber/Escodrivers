@@ -4,7 +4,7 @@ export const CONFIG = {
   SPREADSHEET_ID: '1Ku__ll0kDvp5dCeaS6QdnHrGGeoic-rykib6N1L7jeQ',
   // Apps Script — тільки для запису (updateDriverStatus)
   API_URL:
-    'https://script.google.com/macros/s/AKfycby4ENpB0eUqvi58I8wnrCLXr3kSh0vclfIQwejcUsF6-8HIu_BLHHu70uONhMoy1NKNoQ/exec',
+    'https://script.google.com/macros/s/AKfycbwwHffH3tu6PZ4TL0F1xBo-8imWlFTLxufhiRZgXEGaEAamynzQUzd9U8g5Qhtr3g1NJA/exec',
   // Маршрути (hardcoded)
   ROUTES: ['Маршрут_1', 'Маршрут_2', 'Маршрут_3'],
   SHIPPING: [
