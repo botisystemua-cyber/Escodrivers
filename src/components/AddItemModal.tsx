@@ -54,7 +54,7 @@ export function AddItemModal({ onClose, onAdded }: Props) {
   const [dateTrip, setDateTrip] = useState('');
   const [city, setCity] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState('UAH');
+  const [currency, setCurrency] = useState('CHF');
   const [payForm, setPayForm] = useState('Готівка');
   const [note, setNote] = useState('');
 
@@ -81,9 +81,10 @@ export function AddItemModal({ onClose, onAdded }: Props) {
   const [internalNum, setInternalNum] = useState('');
   const [lastInternalNum, setLastInternalNum] = useState<string>('');
   const [loadingNum, setLoadingNum] = useState(false);
-  const [pkgPieces, setPkgPieces] = useState('');
+  const [pkgPieces, setPkgPieces] = useState('1');
+  const [paymentAmount, setPaymentAmount] = useState('');
   const [depositAmount, setDepositAmount] = useState('');
-  const [depositCurrency, setDepositCurrency] = useState('UAH');
+  const [depositCurrency, setDepositCurrency] = useState('CHF');
 
   // Autocomplete state
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -209,6 +210,7 @@ export function AddItemModal({ onClose, onAdded }: Props) {
         data.pkgWeight = pkgWeight;
         data.senderPhone = senderPhone;
         data.amount = amount;
+        data.paymentAmount = paymentAmount;
         data.currency = currency;
         data.payForm = payForm;
         data.deposit = depositAmount;
@@ -422,10 +424,36 @@ export function AddItemModal({ onClose, onAdded }: Props) {
                     )}
                   </div>
 
-                  {/* 4-5. Pieces + Weight */}
+                  {/* 4. К-сть місць + Вага */}
                   <div className="grid grid-cols-2 gap-2">
-                    <Field label="К-сть місць" value={pkgPieces} onChange={setPkgPieces} placeholder="1" type="number" />
+                    <div>
+                      <label className="block text-[11px] font-semibold text-muted uppercase mb-1">К-сть місць</label>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setPkgPieces(String(Math.max(1, (parseInt(pkgPieces) || 1) - 1)))}
+                          className="w-10 h-10 rounded-xl bg-gray-100 text-gray-600 font-bold text-lg flex items-center justify-center cursor-pointer active:scale-95 transition-all hover:bg-gray-200">−</button>
+                        <input type="number" value={pkgPieces} onChange={(e) => setPkgPieces(e.target.value)}
+                          className="flex-1 px-2 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text text-center font-bold focus:outline-none focus:border-brand" />
+                        <button onClick={() => setPkgPieces(String((parseInt(pkgPieces) || 0) + 1))}
+                          className="w-10 h-10 rounded-xl bg-blue-500 text-white font-bold text-lg flex items-center justify-center cursor-pointer active:scale-95 transition-all hover:bg-blue-600">+</button>
+                      </div>
+                    </div>
                     <Field label="Вага (кг)" value={pkgWeight} onChange={setPkgWeight} placeholder="кг" type="number" />
+                  </div>
+
+                  {/* 5. Оціночна вартість */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Оціночна вартість *</label>
+                    <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text placeholder:text-gray-300 focus:outline-none focus:border-brand" />
+                    <div className="flex gap-1.5 mt-1.5">
+                      {['50', '100', '200', '500'].map((v) => (
+                        <button key={v} onClick={() => setAmount(v)}
+                          className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold cursor-pointer transition-all ${
+                            amount === v ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                          }`}>{v}</button>
+                      ))}
+                    </div>
                   </div>
 
                   {/* 6. Sender */}
@@ -434,29 +462,33 @@ export function AddItemModal({ onClose, onAdded }: Props) {
                     <Field label="Тел. або ІД *" value={senderPhone} onChange={setSenderPhone} placeholder="+380... або ID" />
                   </div>
 
-                  {/* 7. Оціночна вартість + оплата */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label="Оціночна вартість *" value={amount} onChange={setAmount} placeholder="0" type="number" />
+                  {/* 7. Оплата */}
+                  <div className="bg-gray-50/80 rounded-xl p-2.5 space-y-2">
+                    <label className="text-[11px] font-semibold text-text uppercase">Оплата</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Field label="Сума" value={paymentAmount} onChange={setPaymentAmount} placeholder="0" type="number" />
+                      <div>
+                        <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Валюта</label>
+                        <div className="flex gap-1">
+                          {['CHF', 'EUR', 'UAH', 'USD'].map((c) => (
+                            <button key={c} onClick={() => setCurrency(c)}
+                              className={`flex-1 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                                currency === c ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-400'
+                              }`}>{c}</button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                     <div>
                       <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Форма оплати</label>
-                      <select value={payForm} onChange={(e) => setPayForm(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text focus:outline-none focus:border-brand">
-                        <option value="Готівка">Готівка</option>
-                        <option value="Картка">Картка</option>
-                        <option value="Переказ">Переказ</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Валюта</label>
-                    <div className="flex gap-1.5">
-                      {['UAH', 'EUR', 'CHF', 'PLN', 'USD'].map((c) => (
-                        <button key={c} onClick={() => setCurrency(c)}
-                          className={`flex-1 py-2 rounded-xl text-[11px] font-bold cursor-pointer transition-all ${
-                            currency === c ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-400'
-                          }`}>{c}</button>
-                      ))}
+                      <div className="flex gap-1">
+                        {['Готівка', 'Картка', 'Наложка', 'Борг', 'Частково'].map((f) => (
+                          <button key={f} onClick={() => setPayForm(f)}
+                            className={`flex-1 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
+                              payForm === f ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-400'
+                            }`}>{f}</button>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
@@ -468,7 +500,7 @@ export function AddItemModal({ onClose, onAdded }: Props) {
                       <div>
                         <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Валюта</label>
                         <div className="flex gap-1">
-                          {['UAH', 'EUR', 'CHF', 'USD'].map((c) => (
+                          {['CHF', 'EUR', 'UAH', 'USD'].map((c) => (
                             <button key={c} onClick={() => setDepositCurrency(c)}
                               className={`flex-1 py-2 rounded-lg text-[10px] font-bold cursor-pointer transition-all ${
                                 depositCurrency === c ? 'bg-amber-500 text-white shadow-sm' : 'bg-gray-100 text-gray-400'

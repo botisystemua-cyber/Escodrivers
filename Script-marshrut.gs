@@ -580,10 +580,11 @@ function handleAddRouteItem(data) {
       shipRow[COL_SHIP.WEIGHT] = data.pkgWeight || '';
       shipRow[COL_SHIP.DESCRIPTION] = data.pkgDesc || '';
       shipRow[COL_SHIP.AMOUNT] = data.amount || '';
-      shipRow[COL_SHIP.CURRENCY] = data.currency || 'UAH';
+      shipRow[COL_SHIP.CURRENCY] = data.currency || 'CHF';
       shipRow[COL_SHIP.DEPOSIT] = data.deposit || '';
-      shipRow[COL_SHIP.DEPOSIT_CURRENCY] = data.depositCurrency || '';
+      shipRow[COL_SHIP.DEPOSIT_CURRENCY] = data.depositCurrency || 'CHF';
       shipRow[COL_SHIP.PAY_FORM] = data.payForm || '';
+      shipRow[COL_SHIP.DEBT] = data.paymentAmount || '';
       shipRow[COL_SHIP.STATUS] = 'pending';
       // Compose note: include pieces count if provided
       var shipNote = data.note || '';
