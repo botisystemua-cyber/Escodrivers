@@ -55,7 +55,7 @@ export function AddItemModal({ onClose, onAdded }: Props) {
   const [city, setCity] = useState('');
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('UAH');
-  const [payForm, setPayForm] = useState('');
+  const [payForm, setPayForm] = useState('Готівка');
   const [note, setNote] = useState('');
 
   // Passenger fields
@@ -165,6 +165,7 @@ export function AddItemModal({ onClose, onAdded }: Props) {
       if (!internalNum.trim()) { showToast('Введи внутрішній номер'); return; }
       if (!recipientPhone.trim()) { showToast('Введи тел. отримувача'); return; }
       if (!senderPhone.trim()) { showToast('Введи тел./ІД відправника'); return; }
+      if (!amount.trim()) { showToast('Введи оціночну вартість'); return; }
       // Check for duplicate internal number
       if (lastInternalNum && internalNum.trim() === lastInternalNum) {
         showToast('Цей номер вже існує! Попередній: ' + lastInternalNum);
@@ -207,6 +208,9 @@ export function AddItemModal({ onClose, onAdded }: Props) {
         data.pkgPieces = pkgPieces;
         data.pkgWeight = pkgWeight;
         data.senderPhone = senderPhone;
+        data.amount = amount;
+        data.currency = currency;
+        data.payForm = payForm;
         data.deposit = depositAmount;
         data.depositCurrency = depositCurrency;
         // Save recipient contact for future autocomplete
@@ -430,7 +434,33 @@ export function AddItemModal({ onClose, onAdded }: Props) {
                     <Field label="Тел. або ІД *" value={senderPhone} onChange={setSenderPhone} placeholder="+380... або ID" />
                   </div>
 
-                  {/* 7. Пакетик (cash envelope) */}
+                  {/* 7. Оціночна вартість + оплата */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <Field label="Оціночна вартість *" value={amount} onChange={setAmount} placeholder="0" type="number" />
+                    <div>
+                      <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Форма оплати</label>
+                      <select value={payForm} onChange={(e) => setPayForm(e.target.value)}
+                        className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text focus:outline-none focus:border-brand">
+                        <option value="Готівка">Готівка</option>
+                        <option value="Картка">Картка</option>
+                        <option value="Переказ">Переказ</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Валюта</label>
+                    <div className="flex gap-1.5">
+                      {['UAH', 'EUR', 'CHF', 'PLN', 'USD'].map((c) => (
+                        <button key={c} onClick={() => setCurrency(c)}
+                          className={`flex-1 py-2 rounded-xl text-[11px] font-bold cursor-pointer transition-all ${
+                            currency === c ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-400'
+                          }`}>{c}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 8. Пакетик (cash envelope) */}
                   <div className="bg-amber-50/50 rounded-xl p-2.5 space-y-2">
                     <label className="text-[11px] font-semibold text-amber-600 uppercase">Пакетик (готівка)</label>
                     <div className="grid grid-cols-2 gap-2">

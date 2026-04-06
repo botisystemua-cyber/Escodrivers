@@ -66,7 +66,7 @@ export function ShippingCard({ item, index, onEdit }: Props) {
           <div className="flex-1 min-w-0">
             {item._sourceRoute && <span className="inline-block px-2 py-0.5 rounded-full text-[9px] font-bold text-blue-600 bg-blue-50 mb-0.5">{item._sourceRoute}</span>}
             <div className="font-bold text-text text-[13px] leading-snug truncate">
-              {item.senderName || '—'}
+              {item.recipientName || '—'}
             </div>
             {item.recipientAddr && (
               <div className="text-xs text-secondary truncate flex items-center gap-1">
@@ -82,8 +82,8 @@ export function ShippingCard({ item, index, onEdit }: Props) {
         {/* Key info */}
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           {item.internalNum && (
-            <span className="text-xs font-semibold text-text flex items-center gap-1">
-              <Package className="w-3 h-3 text-blue-500" />#{item.internalNum}
+            <span className="text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+              <Package className="w-3 h-3" />#ВН-{item.internalNum}
             </span>
           )}
           {item.recipientPhone && (
@@ -94,6 +94,11 @@ export function ShippingCard({ item, index, onEdit }: Props) {
           {item.amount && (
             <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
               <CreditCard className="w-3 h-3" />{item.amount}{item.currency ? ' ' + item.currency : ''}
+            </span>
+          )}
+          {item.deposit && (
+            <span className="text-xs font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full flex items-center gap-1">
+              📦 {item.deposit}{item.depositCurrency ? ' ' + item.depositCurrency : ''}
             </span>
           )}
         </div>
