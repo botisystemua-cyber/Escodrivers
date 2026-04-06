@@ -399,7 +399,7 @@ export function AddItemModal({ onClose, onAdded }: Props) {
                   </div>
 
                   {/* 3. Cargo description with autocomplete */}
-                  <div className="relative" ref={suggestionsRef}>
+                  <div ref={suggestionsRef}>
                     <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Опис вантажу</label>
                     <input
                       type="text"
@@ -411,7 +411,7 @@ export function AddItemModal({ onClose, onAdded }: Props) {
                       className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text placeholder:text-gray-300 focus:outline-none focus:border-brand"
                     />
                     {showSuggestions && filteredSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-40 overflow-y-auto">
+                      <div className="mt-1 bg-white border border-gray-200 rounded-xl shadow-sm max-h-32 overflow-y-auto">
                         {filteredSuggestions.map((s) => (
                           <button key={s}
                             onMouseDown={(e) => e.preventDefault()}
