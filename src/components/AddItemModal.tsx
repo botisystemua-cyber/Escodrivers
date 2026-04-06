@@ -425,16 +425,16 @@ export function AddItemModal({ onClose, onAdded }: Props) {
                   </div>
 
                   {/* 4. К-сть місць + Вага */}
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-[1fr_80px] gap-2">
                     <div>
                       <label className="block text-[11px] font-semibold text-muted uppercase mb-1">К-сть місць</label>
                       <div className="flex items-center gap-1">
                         <button onClick={() => setPkgPieces(String(Math.max(1, (parseInt(pkgPieces) || 1) - 1)))}
-                          className="w-10 h-10 rounded-xl bg-gray-100 text-gray-600 font-bold text-lg flex items-center justify-center cursor-pointer active:scale-95 transition-all hover:bg-gray-200">−</button>
+                          className="w-8 h-9 shrink-0 rounded-lg bg-gray-100 text-gray-600 font-bold text-base flex items-center justify-center cursor-pointer active:scale-95 transition-all hover:bg-gray-200">−</button>
                         <input type="number" value={pkgPieces} onChange={(e) => setPkgPieces(e.target.value)}
-                          className="flex-1 px-2 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text text-center font-bold focus:outline-none focus:border-brand" />
+                          className="flex-1 min-w-0 px-1 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-text text-center font-bold focus:outline-none focus:border-brand" />
                         <button onClick={() => setPkgPieces(String((parseInt(pkgPieces) || 0) + 1))}
-                          className="w-10 h-10 rounded-xl bg-blue-500 text-white font-bold text-lg flex items-center justify-center cursor-pointer active:scale-95 transition-all hover:bg-blue-600">+</button>
+                          className="w-8 h-9 shrink-0 rounded-lg bg-blue-500 text-white font-bold text-base flex items-center justify-center cursor-pointer active:scale-95 transition-all hover:bg-blue-600">+</button>
                       </div>
                     </div>
                     <Field label="Вага (кг)" value={pkgWeight} onChange={setPkgWeight} placeholder="кг" type="number" />
