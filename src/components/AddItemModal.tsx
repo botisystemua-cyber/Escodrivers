@@ -9,14 +9,12 @@ interface Props {
 }
 
 export function AddItemModal({ onClose, onAdded }: Props) {
-  const { currentSheet, isUnifiedView, routes, driverName, viewTab, showToast } = useApp();
+  const { currentSheet, isUnifiedView, routes, driverName, showToast } = useApp();
 
-  const defaultType = viewTab === 'packages' || viewTab === 'shipping' ? 'посилка' : 'пасажир';
-  const [itemType, setItemType] = useState<'пасажир' | 'посилка'>(defaultType);
+  const [itemType, setItemType] = useState<'пасажир' | 'посилка'>('посилка');
   const [selectedRoute, setSelectedRoute] = useState(isUnifiedView ? routes[0]?.name || '' : currentSheet);
   const [submitting, setSubmitting] = useState(false);
-  const defaultDirection = viewTab === 'shipping' ? 'відправка' : 'отримання';
-  const [direction, setDirection] = useState<'отримання' | 'відправка'>(defaultDirection);
+  const [direction, setDirection] = useState<'отримання' | 'відправка'>('відправка');
 
   // Common fields
   const [dateTrip, setDateTrip] = useState('');
