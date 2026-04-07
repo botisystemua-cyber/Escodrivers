@@ -56,7 +56,7 @@ export function ListScreen() {
   const shippingSheetName = shippingRoutes.find((s) => s.name === 'Відправка_' + routeNum)?.name || '';
   const hasShipping = !!shippingSheetName || isUnifiedView;
 
-  const isPackagesMode = viewTab === 'packages' || viewTab === 'shipping' || viewTab === 'allPackages';
+  const isPackagesMode = viewTab === 'packages' || viewTab === 'shipping' || viewTab === 'allPackages' || viewTab === 'pkgUaEu' || viewTab === 'pkgEuUa';
   const isPassengersMode = viewTab === 'passengers' || viewTab === 'paxUaEu' || viewTab === 'paxEuUa';
   const activeMainTab: 'all' | 'passengers' | 'packages' = viewTab === 'all' ? 'all' : isPackagesMode ? 'packages' : isPassengersMode ? 'passengers' : 'passengers';
 
@@ -65,6 +65,7 @@ export function ListScreen() {
     const tabsToLoad: ViewTab[] = tab === 'all' ? ['passengers', 'packages', 'shipping']
       : tab === 'allPackages' ? ['packages', 'shipping']
       : (tab === 'paxUaEu' || tab === 'paxEuUa') ? ['passengers']
+      : (tab === 'pkgUaEu' || tab === 'pkgEuUa') ? ['packages']
       : [tab];
     const needsLoad = tabsToLoad.some((t) => force || !loadedTabs.has(t));
     if (!needsLoad) return;
@@ -164,7 +165,10 @@ export function ListScreen() {
   const filteredPassengers = viewTab === 'paxUaEu' ? filteredPassengersAll.filter((p) => isUaEu(p.direction))
     : viewTab === 'paxEuUa' ? filteredPassengersAll.filter((p) => isEuUa(p.direction))
     : filteredPassengersAll;
-  const filteredPackages = searchIn(filterItems(packages), ['recipientName', 'recipientPhone', 'senderName', 'recipientAddr', 'ttn', 'itemId']);
+  const filteredPackagesAll = searchIn(filterItems(packages), ['recipientName', 'recipientPhone', 'senderName', 'recipientAddr', 'ttn', 'itemId']);
+  const filteredPackages = viewTab === 'pkgUaEu' ? filteredPackagesAll.filter((p) => isUaEu(p.direction))
+    : viewTab === 'pkgEuUa' ? filteredPackagesAll.filter((p) => isEuUa(p.direction))
+    : filteredPackagesAll;
   const filteredShipping = searchIn(filterItems(shippingItems), ['senderName', 'recipientName', 'recipientPhone', 'recipientAddr', 'dispatchId']);
   // У табі "Усі": ховаємо виконані та записи Відправки (їх видно тільки в Посилки→Відправка)
   const allTabPassengers = statusFilter === 'completed' ? filteredPassengers : filteredPassengers.filter((p) => getStatus(p._statusKey) !== 'completed');
@@ -190,6 +194,8 @@ export function ListScreen() {
     : viewTab === 'shipping' ? shippingItems
     : viewTab === 'paxUaEu' ? passengers.filter((p) => isUaEu(p.direction))
     : viewTab === 'paxEuUa' ? passengers.filter((p) => isEuUa(p.direction))
+    : viewTab === 'pkgUaEu' ? packages.filter((p) => isUaEu(p.direction))
+    : viewTab === 'pkgEuUa' ? packages.filter((p) => isEuUa(p.direction))
     : viewTab === 'passengers' ? passengers : packages;
   const statsBase = isUnifiedView && routeFilter !== 'all'
     ? allStatsItems.filter((i) => i._sourceRoute === routeFilter) : allStatsItems;
@@ -263,7 +269,7 @@ export function ListScreen() {
         {/* Main tabs */}
         <div className="flex gap-2 mb-2.5">
           {mainTabs.map((t) => (
-            <button key={t.key} onClick={() => setViewTab(t.key === 'packages' && hasShipping ? 'allPackages' : t.key === 'passengers' ? 'passengers' : t.key)}
+            <button key={t.key} onClick={() => setViewTab(t.key)}
               className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold text-center cursor-pointer transition-all ${
                 activeMainTab === t.key ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-400'
               }`}>
@@ -272,21 +278,23 @@ export function ListScreen() {
           ))}
         </div>
 
-        {/* Sub-tabs: Усі | Отримання | Відправка */}
-        {isPackagesMode && hasShipping && (
+        {/* Sub-tabs: УК→ЄВ | ЄВ→УК | Відправка */}
+        {isPackagesMode && (
           <div className="flex items-center gap-1 mb-2 bg-gray-100 rounded-lg p-0.5">
-            <button onClick={() => setViewTab('allPackages')}
-              className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'allPackages' ? 'bg-white text-text shadow-sm' : 'text-gray-400'}`}>
-              <LayoutGrid className="w-3 h-3 inline mr-1 -mt-0.5" />Усі
+            <button onClick={() => setViewTab('pkgUaEu')}
+              className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'pkgUaEu' ? 'bg-white text-text shadow-sm' : 'text-gray-400'}`}>
+              🇺🇦→🇪🇺 УК-ЄВ
             </button>
-            <button onClick={() => setViewTab('packages')}
-              className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'packages' ? 'bg-white text-text shadow-sm' : 'text-gray-400'}`}>
-              <Package className="w-3 h-3 inline mr-1 -mt-0.5" />Отримання
+            <button onClick={() => setViewTab('pkgEuUa')}
+              className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'pkgEuUa' ? 'bg-white text-text shadow-sm' : 'text-gray-400'}`}>
+              🇪🇺→🇺🇦 ЄВ-УК
             </button>
-            <button onClick={() => setViewTab('shipping')}
-              className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'shipping' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>
-              <Truck className="w-3 h-3 inline mr-1 -mt-0.5" />Відправка
-            </button>
+            {hasShipping && (
+              <button onClick={() => setViewTab('shipping')}
+                className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'shipping' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>
+                <Truck className="w-3 h-3 inline mr-1 -mt-0.5" />Відправка
+              </button>
+            )}
           </div>
         )}
 
