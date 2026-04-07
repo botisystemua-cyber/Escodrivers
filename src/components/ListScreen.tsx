@@ -4,6 +4,8 @@ import {
   ListFilter, LayoutGrid, Search, X,
 } from 'lucide-react';
 import { useApp } from '../store/useAppStore';
+import { ThemeSplash } from './ThemeSplash';
+import type { Theme } from '../store/useAppStore';
 import { fetchPassengers, fetchPackages, fetchShippingItems } from '../api';
 import { PassengerCard } from './PassengerCard';
 import { PackageCard } from './PackageCard';
@@ -20,7 +22,17 @@ export function ListScreen() {
     statusFilter, setStatusFilter, getStatus, setStatus,
     routeFilter, setRouteFilter, routes, shippingRoutes,
     viewTab, setViewTab,
+    theme, setTheme,
   } = useApp();
+
+  const [splashTheme, setSplashTheme] = useState<Theme | null>(null);
+  const THEME_CYCLE: Theme[] = ['top-driver', 'lone-wolf'];
+  const cycleTheme = () => {
+    const idx = THEME_CYCLE.indexOf(theme);
+    const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
+    setSplashTheme(next);
+    setTheme(next);
+  };
 
   const [passengers, setPassengers] = useState<Passenger[]>([]);
   const [packages, setPackages] = useState<Pkg[]>([]);
@@ -206,7 +218,13 @@ export function ListScreen() {
               <ArrowLeft className="w-5 h-5 text-text" />
             </button>
             <div className="flex items-center gap-2">
-              {isUnifiedView ? <BarChart3 className="w-5 h-5 text-brand" /> : <Package className="w-5 h-5 text-brand" />}
+              <button
+                onClick={cycleTheme}
+                className="relative w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer active:scale-90 transition-transform"
+                title="Змінити тему"
+              >
+                <ThemeBadge theme={theme} unified={isUnifiedView} />
+              </button>
               <span className="text-sm font-bold text-text">{isUnifiedView ? 'Усі маршрути' : currentSheet}</span>
             </div>
           </div>
@@ -388,7 +406,60 @@ export function ListScreen() {
       {showColumnEditor && <ColumnEditor onClose={() => setShowColumnEditor(false)} />}
       {showAddModal && <AddItemModal onClose={() => setShowAddModal(false)} onAdded={refresh} />}
       {editItem && <EditItemModal item={editItem} onClose={() => setEditItem(null)} onSaved={refresh} />}
+      {splashTheme && <ThemeSplash theme={splashTheme} onDone={() => setSplashTheme(null)} />}
     </div>
+  );
+}
+
+function ThemeBadge({ theme, unified }: { theme: Theme; unified: boolean }) {
+  if (unified) return <BarChart3 className="w-5 h-5 text-brand" />;
+  if (theme === 'lone-wolf') {
+    // Stylized wolf head silhouette
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <defs>
+          <linearGradient id="wolfGrad" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#e0e0e8" />
+            <stop offset="100%" stopColor="#7a7a82" />
+          </linearGradient>
+        </defs>
+        <path
+          d="M4,11 L2,7 L5,8 L6,4 L9,7 L12,3 L15,7 L18,4 L19,8 L22,7 L20,11 L21,15 L18,19 L15,21 L12,20 L9,21 L6,19 L3,15 Z"
+          fill="url(#wolfGrad)"
+          stroke="#4a4a52"
+          strokeWidth="0.6"
+          strokeLinejoin="round"
+        />
+        <circle cx="9.5" cy="13" r="1" fill="#0a0a0c" />
+        <circle cx="14.5" cy="13" r="1" fill="#0a0a0c" />
+        <path d="M11,16 L12,17 L13,16" stroke="#0a0a0c" strokeWidth="0.8" strokeLinecap="round" fill="none" />
+      </svg>
+    );
+  }
+  // top-driver — stylized hex with car icon
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <defs>
+        <linearGradient id="hexGrad" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stopColor="#34d399" />
+          <stop offset="100%" stopColor="#16a34a" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M12,2 L21,7 L21,17 L12,22 L3,17 L3,7 Z"
+        fill="url(#hexGrad)"
+        stroke="#0f6b30"
+        strokeWidth="0.6"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7,14 L8.5,10 L15.5,10 L17,14 Z"
+        fill="#fff"
+        opacity="0.95"
+      />
+      <circle cx="9" cy="15" r="1.2" fill="#0f1f12" />
+      <circle cx="15" cy="15" r="1.2" fill="#0f1f12" />
+    </svg>
   );
 }
 

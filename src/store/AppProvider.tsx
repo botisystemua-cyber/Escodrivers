@@ -1,5 +1,5 @@
-import { useState, useCallback, useMemo, type ReactNode } from 'react';
-import { AppContext, type AppStore } from './useAppStore';
+import { useState, useCallback, useMemo, useEffect, type ReactNode } from 'react';
+import { AppContext, type AppStore, type Theme } from './useAppStore';
 import type { ItemStatus, StatusFilter, Route, ShippingRoute, ViewTab } from '../types';
 
 function loadStatuses(sheet: string): Record<string, ItemStatus> {
@@ -29,6 +29,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [shippingRoutes, setShippingRoutes] = useState<ShippingRoute[]>([]);
   const [toastMessage, setToastMessage] = useState('');
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(loadHiddenCols);
+  const [theme, setThemeState] = useState<Theme>(() => (localStorage.getItem('driverTheme') as Theme) || 'top-driver');
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const setTheme = useCallback((t: Theme) => {
+    setThemeState(t);
+    localStorage.setItem('driverTheme', t);
+  }, []);
 
   const setDriverName = useCallback((name: string) => {
     setDriverNameState(name);
@@ -83,11 +93,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     statusFilter, setStatusFilter, routeFilter, setRouteFilter,
     viewTab, setViewTab, routes, setRoutes, shippingRoutes, setShippingRoutes,
     openRoute, goBack, toastMessage, showToast, hiddenCols, toggleCol,
+    theme, setTheme,
   }), [
     driverName, setDriverName, currentScreen, currentSheet,
     isUnifiedView, statuses, setStatus, getStatus,
     statusFilter, routeFilter, viewTab, routes, shippingRoutes,
     openRoute, goBack, toastMessage, showToast, hiddenCols, toggleCol,
+    theme, setTheme,
   ]);
 
   return <AppContext.Provider value={store}>{children}</AppContext.Provider>;

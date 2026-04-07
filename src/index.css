@@ -1,16 +1,41 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand: #22c55e;
-  --color-brand-dark: #16a34a;
-  --color-brand-light: #f0fdf4;
-  --color-bg: #f2f4f7;
-  --color-card: #ffffff;
-  --color-text: #111827;
-  --color-text-secondary: #6b7280;
-  --color-border: #e5e7eb;
-  --color-muted: #9ca3af;
+  --color-brand: var(--theme-brand);
+  --color-brand-dark: var(--theme-brand-dark);
+  --color-brand-light: var(--theme-brand-light);
+  --color-bg: var(--theme-bg);
+  --color-card: var(--theme-card);
+  --color-text: var(--theme-text);
+  --color-text-secondary: var(--theme-text-secondary);
+  --color-border: var(--theme-border);
+  --color-muted: var(--theme-muted);
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+:root,
+[data-theme="top-driver"] {
+  --theme-brand: #22c55e;
+  --theme-brand-dark: #16a34a;
+  --theme-brand-light: #f0fdf4;
+  --theme-bg: #f2f4f7;
+  --theme-card: #ffffff;
+  --theme-text: #111827;
+  --theme-text-secondary: #6b7280;
+  --theme-border: #e5e7eb;
+  --theme-muted: #9ca3af;
+}
+
+[data-theme="lone-wolf"] {
+  --theme-brand: #c0c0c8;
+  --theme-brand-dark: #8a8a92;
+  --theme-brand-light: #2a2a2e;
+  --theme-bg: #161618;
+  --theme-card: #232327;
+  --theme-text: #ececee;
+  --theme-text-secondary: #a8a8b0;
+  --theme-border: #34343a;
+  --theme-muted: #6e6e76;
 }
 
 @layer base {
@@ -30,4 +55,45 @@
 @keyframes slideUp {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
+}
+
+/* === Theme splash animations === */
+@keyframes splashFade {
+  0% { opacity: 0; }
+  10%, 80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@keyframes moonRise {
+  0% { transform: translate(-50%, 60px) scale(0.4); opacity: 0; filter: blur(8px); }
+  100% { transform: translate(-50%, 0) scale(1); opacity: 1; filter: blur(0); }
+}
+@keyframes wolfRise {
+  0% { transform: translateY(80px); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@keyframes howlShake {
+  0%, 100% { transform: rotate(0deg); }
+  40% { transform: rotate(-4deg); }
+  60% { transform: rotate(2deg); }
+}
+@keyframes titleIn {
+  0% { opacity: 0; letter-spacing: 0.6em; transform: translateY(20px); }
+  100% { opacity: 1; letter-spacing: 0.25em; transform: translateY(0); }
+}
+@keyframes starTwinkle {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 1; }
+}
+@keyframes mistDrift {
+  0% { transform: translateX(-20px); opacity: 0.4; }
+  100% { transform: translateX(20px); opacity: 0.2; }
+}
+@keyframes speedoNeedle {
+  0% { transform: rotate(-110deg); }
+  60% { transform: rotate(70deg); }
+  100% { transform: rotate(40deg); }
+}
+@keyframes themeBtnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 var(--color-brand); }
+  50% { box-shadow: 0 0 0 6px transparent; }
 }
