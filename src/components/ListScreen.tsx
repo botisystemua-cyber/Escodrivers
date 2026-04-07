@@ -147,14 +147,14 @@ export function ListScreen() {
 
   const prevAllTotalRef = useRef(allTabTotal);
   useEffect(() => {
-    if (showAllTab && allTabTotal < prevAllTotalRef.current) {
+    if (viewTab === 'all' && allTabTotal < prevAllTotalRef.current) {
       setHidingCompleted(true);
       const t = setTimeout(() => setHidingCompleted(false), 500);
       prevAllTotalRef.current = allTabTotal;
       return () => clearTimeout(t);
     }
     prevAllTotalRef.current = allTabTotal;
-  }, [allTabTotal, showAllTab]);
+  }, [allTabTotal, viewTab]);
   const currentItems = viewTab === 'passengers' || viewTab === 'all' ? filteredPassengers : viewTab === 'packages' ? filteredPackages : [];
 
   // Stats
