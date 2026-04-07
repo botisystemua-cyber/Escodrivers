@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 import type { ItemStatus, StatusFilter, Route, ShippingRoute, ViewTab } from '../types';
 
-export type Theme = 'top-driver' | 'lone-wolf';
+export type Theme = 'top-driver' | 'lone-wolf' | 'detonator' | 'lightning';
 
 export interface AppStore {
   driverName: string;

@@ -15,9 +15,21 @@ const THEME_META: Record<Theme, { title: string; subtitle: string; bg: string; a
   },
   'lone-wolf': {
     title: 'ВОВК-ОДИНАК',
-    subtitle: 'Один на трасі',
+    subtitle: 'Нічний рейс',
     bg: 'radial-gradient(ellipse at center top, #1c1c22 0%, #08080a 100%)',
     accent: '#c0c0c8',
+  },
+  'detonator': {
+    title: 'ПІДРИВНИК',
+    subtitle: 'Швидкість і вогонь',
+    bg: 'linear-gradient(180deg, #ffd500 0%, #ffaa00 100%)',
+    accent: '#d40511',
+  },
+  'lightning': {
+    title: 'БЛИСКАВКА',
+    subtitle: 'Експрес-доставка',
+    bg: 'linear-gradient(180deg, #ffffff 0%, #ffe5e6 100%)',
+    accent: '#de2329',
   },
 };
 
@@ -36,6 +48,8 @@ export function ThemeSplash({ theme, onDone }: Props) {
     >
       {theme === 'lone-wolf' && <LoneWolfScene accent={meta.accent} />}
       {theme === 'top-driver' && <TopDriverScene accent={meta.accent} />}
+      {theme === 'detonator' && <DetonatorScene accent={meta.accent} />}
+      {theme === 'lightning' && <LightningScene accent={meta.accent} />}
 
       {/* Title */}
       <div
@@ -185,6 +199,120 @@ function TopDriverScene({ accent }: { accent: string }) {
         <circle cx="20" cy="25" r="3" fill="#fff" />
         <circle cx="80" cy="25" r="3" fill="#fff" />
       </svg>
+    </>
+  );
+}
+
+function DetonatorScene({ accent }: { accent: string }) {
+  return (
+    <>
+      {/* Flash */}
+      <div
+        className="absolute inset-0"
+        style={{ background: '#fff', animation: 'flash 0.3s 0.4s ease-out both' }}
+      />
+      {/* Explosion */}
+      <div
+        className="absolute top-[20%] left-1/2"
+        style={{ transform: 'translateX(-50%)', animation: 'explosionPop 1s 0.2s ease-out both' }}
+      >
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          <defs>
+            <radialGradient id="boom" cx="50%" cy="50%">
+              <stop offset="0%" stopColor="#fff" />
+              <stop offset="30%" stopColor="#ffeb00" />
+              <stop offset="70%" stopColor={accent} />
+              <stop offset="100%" stopColor="#7a0306" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <path
+            d="M90,10 L105,55 L150,40 L120,80 L170,90 L120,100 L150,140 L105,125 L90,170 L75,125 L30,140 L60,100 L10,90 L60,80 L30,40 L75,55 Z"
+            fill="url(#boom)"
+          />
+        </svg>
+      </div>
+      {/* DHL Truck silhouette */}
+      <div
+        className="absolute"
+        style={{
+          bottom: '32%',
+          left: 0,
+          right: 0,
+          animation: 'truckDrive 1.8s 0.6s cubic-bezier(0.2,0.8,0.4,1) both',
+        }}
+      >
+        <div className="flex justify-center">
+          <svg width="160" height="80" viewBox="0 0 160 80">
+            <rect x="10" y="20" width="90" height="40" fill="#1a1a1a" stroke={accent} strokeWidth="2" rx="3" />
+            <rect x="100" y="30" width="40" height="30" fill="#1a1a1a" stroke={accent} strokeWidth="2" rx="2" />
+            <rect x="105" y="35" width="20" height="15" fill="#ffeb00" opacity="0.9" />
+            <text x="55" y="48" fontSize="20" fontWeight="900" fill="#ffeb00" textAnchor="middle">DHL</text>
+            <circle cx="30" cy="65" r="10" fill="#0a0a0a" stroke={accent} strokeWidth="2" />
+            <circle cx="60" cy="65" r="10" fill="#0a0a0a" stroke={accent} strokeWidth="2" />
+            <circle cx="120" cy="65" r="10" fill="#0a0a0a" stroke={accent} strokeWidth="2" />
+          </svg>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function LightningScene({ accent }: { accent: string }) {
+  return (
+    <>
+      {/* Flash */}
+      <div
+        className="absolute inset-0"
+        style={{ background: accent, animation: 'flash 0.4s 0.2s ease-out both', opacity: 0.4 }}
+      />
+      {/* Big lightning bolt */}
+      <div
+        className="absolute top-[10%] left-1/2"
+        style={{
+          transform: 'translateX(-50%)',
+          transformOrigin: 'top center',
+          animation: 'boltStrike 0.6s ease-out both',
+        }}
+      >
+        <svg width="140" height="240" viewBox="0 0 140 240">
+          <defs>
+            <linearGradient id="bolt" x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor="#fff" />
+              <stop offset="50%" stopColor={accent} />
+              <stop offset="100%" stopColor="#7a0e12" />
+            </linearGradient>
+          </defs>
+          <path
+            d="M80,0 L30,120 L65,120 L40,240 L120,90 L80,90 L110,0 Z"
+            fill="url(#bolt)"
+            stroke="#fff"
+            strokeWidth="2"
+            style={{ filter: `drop-shadow(0 0 20px ${accent})` }}
+          />
+        </svg>
+      </div>
+      {/* NP truck silhouette */}
+      <div
+        className="absolute"
+        style={{
+          bottom: '30%',
+          left: 0,
+          right: 0,
+          animation: 'truckDrive 1.6s 0.7s cubic-bezier(0.2,0.8,0.4,1) both',
+        }}
+      >
+        <div className="flex justify-center">
+          <svg width="150" height="70" viewBox="0 0 150 70">
+            <rect x="5" y="15" width="100" height="38" fill={accent} stroke="#7a0e12" strokeWidth="2" rx="3" />
+            <rect x="105" y="25" width="35" height="28" fill={accent} stroke="#7a0e12" strokeWidth="2" rx="2" />
+            <rect x="110" y="30" width="18" height="14" fill="#fff" opacity="0.95" />
+            <text x="55" y="42" fontSize="16" fontWeight="900" fill="#fff" textAnchor="middle">НП</text>
+            <circle cx="25" cy="58" r="9" fill="#1a1a1a" stroke={accent} strokeWidth="2" />
+            <circle cx="55" cy="58" r="9" fill="#1a1a1a" stroke={accent} strokeWidth="2" />
+            <circle cx="120" cy="58" r="9" fill="#1a1a1a" stroke={accent} strokeWidth="2" />
+          </svg>
+        </div>
+      </div>
     </>
   );
 }

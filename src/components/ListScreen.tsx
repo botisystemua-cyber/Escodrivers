@@ -26,7 +26,7 @@ export function ListScreen() {
   } = useApp();
 
   const [splashTheme, setSplashTheme] = useState<Theme | null>(null);
-  const THEME_CYCLE: Theme[] = ['top-driver', 'lone-wolf'];
+  const THEME_CYCLE: Theme[] = ['top-driver', 'lone-wolf', 'detonator', 'lightning'];
   const cycleTheme = () => {
     const idx = THEME_CYCLE.indexOf(theme);
     const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
@@ -413,6 +413,22 @@ export function ListScreen() {
 
 function ThemeBadge({ theme, unified }: { theme: Theme; unified: boolean }) {
   if (unified) return <BarChart3 className="w-5 h-5 text-brand" />;
+  if (theme === 'detonator') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#ffd500" stroke="#d40511" strokeWidth="1.5" />
+        <text x="12" y="16" fontSize="9" fontWeight="900" fill="#d40511" textAnchor="middle">DHL</text>
+      </svg>
+    );
+  }
+  if (theme === 'lightning') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#de2329" stroke="#7a0e12" strokeWidth="1.2" />
+        <path d="M13,4 L7,13 L11,13 L9,20 L17,10 L13,10 L15,4 Z" fill="#fff" />
+      </svg>
+    );
+  }
   if (theme === 'lone-wolf') {
     // Stylized wolf head silhouette
     return (
