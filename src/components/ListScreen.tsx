@@ -140,8 +140,8 @@ export function ListScreen() {
   const filteredPackages = searchIn(filterItems(packages), ['recipientName', 'recipientPhone', 'senderName', 'recipientAddr', 'ttn', 'itemId']);
   const filteredShipping = searchIn(filterItems(shippingItems), ['senderName', 'recipientName', 'recipientPhone', 'recipientAddr', 'dispatchId']);
   // У табі "Усі": ховаємо виконані та записи Відправки (їх видно тільки в Посилки→Відправка)
-  const allTabPassengers = filteredPassengers.filter((p) => getStatus(p._statusKey) !== 'completed');
-  const allTabPackages = filteredPackages.filter((p) => getStatus(p._statusKey) !== 'completed');
+  const allTabPassengers = statusFilter === 'completed' ? filteredPassengers : filteredPassengers.filter((p) => getStatus(p._statusKey) !== 'completed');
+  const allTabPackages = statusFilter === 'completed' ? filteredPackages : filteredPackages.filter((p) => getStatus(p._statusKey) !== 'completed');
   const currentItems = viewTab === 'passengers' || viewTab === 'all' ? filteredPassengers : viewTab === 'packages' ? filteredPackages : [];
 
   // Stats
