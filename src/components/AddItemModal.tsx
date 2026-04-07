@@ -101,6 +101,7 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка' 
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
   const isShipping = itemType === 'посилка' && direction === 'відправка';
+  const isPickup = itemType === 'посилка' && direction === 'отримання';
 
   // Fetch last internal number when in shipping mode
   const loadLastInternalNum = useCallback(async () => {
@@ -181,6 +182,9 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка' 
         showToast('Цей номер вже існує! Попередній: ' + lastInternalNum);
         return;
       }
+    } else if (isPickup) {
+      if (!senderPhone.trim()) { showToast('Введи телефон клієнта'); return; }
+      if (!addrFrom.trim()) { showToast('Введи адресу забору'); return; }
     } else {
       if (!recipientName.trim()) { showToast('Введи отримувача'); return; }
     }
@@ -234,6 +238,17 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка' 
         data.depositCurrency = depositCurrency;
         // Save recipient contact for future autocomplete
         saveContact(recipientPhone, recipientName, recipientAddr);
+      } else if (isPickup) {
+        // Заїзд за посилкою (виклик курʼєра, ЄВ→УК)
+        data.direction = 'Європа-УК';
+        data.dateTrip = dateTrip;
+        data.timing = timing;
+        data.city = city;
+        data.senderName = senderName;
+        data.senderPhone = senderPhone;
+        data.addrFrom = addrFrom;
+        data.pkgDesc = pkgDesc;
+        data.note = note;
       } else {
         data.direction = 'отримання';
         data.dateTrip = dateTrip;
@@ -429,9 +444,9 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка' 
               <div className="flex gap-2">
                 <button onClick={() => setDirection('отримання')}
                   className={`flex-1 py-2 rounded-xl text-[12px] font-bold text-center cursor-pointer transition-all ${
-                    direction === 'отримання' ? 'bg-emerald-500 text-white shadow-sm' : 'bg-gray-100 text-gray-400'
+                    direction === 'отримання' ? 'bg-orange-500 text-white shadow-sm' : 'bg-gray-100 text-gray-400'
                   }`}>
-                  <Package className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />Отримання
+                  🚚 Заїзд EU→UA
                 </button>
                 <button onClick={() => setDirection('відправка')}
                   className={`flex-1 py-2 rounded-xl text-[12px] font-bold text-center cursor-pointer transition-all ${
@@ -593,53 +608,21 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка' 
                   </div>
                 </>
               ) : (
-                /* ===== ОТРИМАННЯ FORM (existing) ===== */
+                /* ===== ЗАЇЗД ЗА ПОСИЛКОЮ (виклик курʼєра, EU→UA) ===== */
                 <>
+                  <div className="bg-orange-50 border border-orange-200 rounded-xl p-2.5 text-[11px] text-orange-700 font-semibold">
+                    🚚 Заїзд до клієнта в Європі — забрати посилку для відправки в Україну. Обовʼязкові тільки телефон і адреса.
+                  </div>
+                  <Field label="Імʼя клієнта" value={senderName} onChange={setSenderName} placeholder="ПІБ" />
+                  <Field label="Телефон *" value={senderPhone} onChange={setSenderPhone} placeholder="+380... / +41..." type="tel" />
+                  <Field label="Адреса забору *" value={addrFrom} onChange={setAddrFrom} placeholder="Країна, місто, вулиця..." />
                   <div className="grid grid-cols-2 gap-2">
-                    <Field label="Дата рейсу" value={dateTrip} onChange={setDateTrip} type="date" />
-                    <Field label="Місто" value={city} onChange={setCity} placeholder="Київ" />
+                    <Field label="Дата заїзду" value={dateTrip} onChange={setDateTrip} type="date" />
+                    <Field label="Час" value={timing} onChange={setTiming} placeholder="14:00" />
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label="Відправник" value={senderName} onChange={setSenderName} placeholder="ПІБ" />
-                    <Field label="Тел. відправника" value={senderPhone} onChange={setSenderPhone} placeholder="+380..." type="tel" />
-                  </div>
-                  <Field label="Отримувач *" value={recipientName} onChange={setRecipientName} placeholder="ПІБ" />
-                  <Field label="Тел. отримувача" value={recipientPhone} onChange={setRecipientPhone} placeholder="+380..." type="tel" />
-                  <Field label="Адреса отримувача" value={recipientAddr} onChange={setRecipientAddr} placeholder="Місто, вулиця..." />
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label="Опис" value={pkgDesc} onChange={setPkgDesc} placeholder="Що відправляється" />
-                    <Field label="Вага (кг)" value={pkgWeight} onChange={setPkgWeight} type="number" />
-                  </div>
-                  <Field label="ТТН" value={ttn} onChange={setTtn} placeholder="Номер ТТН" />
-
-                  {/* Payment section */}
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label="Сума" value={amount} onChange={setAmount} placeholder="0" type="number" />
-                    <div>
-                      <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Форма оплати</label>
-                      <select value={payForm} onChange={(e) => setPayForm(e.target.value)}
-                        className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text focus:outline-none focus:border-brand">
-                        <option value="">—</option>
-                        <option value="Готівка">Готівка</option>
-                        <option value="Картка">Картка</option>
-                        <option value="Переказ">Переказ</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Валюта</label>
-                    <div className="flex gap-1.5">
-                      {['UAH', 'EUR', 'CHF', 'PLN', 'USD'].map((c) => (
-                        <button key={c} onClick={() => setCurrency(c)}
-                          className={`flex-1 py-2 rounded-xl text-[11px] font-bold cursor-pointer transition-all ${
-                            currency === c ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-400'
-                          }`}>{c}</button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <Field label="Примітка" value={note} onChange={setNote} placeholder="Додаткова інформація" />
+                  <Field label="Місто" value={city} onChange={setCity} placeholder="Цюріх" />
+                  <Field label="Опис посилки" value={pkgDesc} onChange={setPkgDesc} placeholder="Що забираємо" />
+                  <Field label="Примітка" value={note} onChange={setNote} placeholder="Деталі, побажання" />
                 </>
               )}
             </>
