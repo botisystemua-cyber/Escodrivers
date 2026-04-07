@@ -94,11 +94,11 @@
   --theme-brand: #de2329;
   --theme-brand-dark: #a8161b;
   --theme-brand-light: #fff0f0;
-  --theme-bg: #fafafa;
-  --theme-card: #ffffff;
-  --theme-text: #1a1a1a;
-  --theme-text-secondary: #6b1a1d;
-  --theme-border: #f0d0d2;
+  --theme-bg: #f5dcdd;
+  --theme-card: #fff5f5;
+  --theme-text: #2a0a0c;
+  --theme-text-secondary: #7a2225;
+  --theme-border: #e8b8ba;
   --theme-muted: #a06868;
 }
 
