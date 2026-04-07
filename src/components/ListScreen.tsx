@@ -49,6 +49,7 @@ export function ListScreen() {
   const [showColumnEditor, setShowColumnEditor] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editItem, setEditItem] = useState<RouteItem | null>(null);
+  const [convertingPickup, setConvertingPickup] = useState<Pkg | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [hidingCompleted, setHidingCompleted] = useState(false);
 
@@ -368,7 +369,7 @@ export function ListScreen() {
                     <span className="text-[10px] font-bold text-muted bg-gray-100 px-2 py-0.5 rounded-full">{filteredPackages.length}</span>
                   </div>
                   {filteredPackages.map((p, i) => (
-                    <PackageCard key={p._statusKey} pkg={p} index={i} searchQuery={searchQuery} onEdit={setEditItem} />
+                    <PackageCard key={p._statusKey} pkg={p} index={i} searchQuery={searchQuery} onEdit={setEditItem} onConvertPickup={setConvertingPickup} />
                   ))}
                 </>
               )}
@@ -418,7 +419,7 @@ export function ListScreen() {
                     <span className="text-[10px] font-bold text-muted bg-gray-100 px-2 py-0.5 rounded-full">{allTabPackages.length}</span>
                   </div>
                   {allTabPackages.map((p, i) => (
-                    <PackageCard key={p._statusKey} pkg={p} index={i} searchQuery={searchQuery} onEdit={setEditItem} />
+                    <PackageCard key={p._statusKey} pkg={p} index={i} searchQuery={searchQuery} onEdit={setEditItem} onConvertPickup={setConvertingPickup} />
                   ))}
                 </>
               )}
@@ -430,7 +431,7 @@ export function ListScreen() {
           ))
         ) : (
           currentItems.length === 0 ? <Empty /> : (currentItems as Pkg[]).map((p, i) => (
-            <PackageCard key={p._statusKey} pkg={p} index={i} searchQuery={searchQuery} onEdit={setEditItem} />
+            <PackageCard key={p._statusKey} pkg={p} index={i} searchQuery={searchQuery} onEdit={setEditItem} onConvertPickup={setConvertingPickup} />
           ))
         )}
       </div>
@@ -447,6 +448,25 @@ export function ListScreen() {
       {/* Modals */}
       {showColumnEditor && <ColumnEditor onClose={() => setShowColumnEditor(false)} />}
       {showAddModal && <AddItemModal onClose={() => setShowAddModal(false)} onAdded={refresh} defaultType={isPassengersMode ? 'пасажир' : 'посилка'} />}
+      {convertingPickup && (
+        <AddItemModal
+          onClose={() => setConvertingPickup(null)}
+          onAdded={() => {
+            setStatus(convertingPickup._statusKey, 'completed');
+            showToast('Заїзд оформлено як відправку');
+            refresh();
+          }}
+          defaultType="посилка"
+          forceShipping
+          prefill={{
+            senderName: convertingPickup.senderName,
+            senderPhone: convertingPickup.senderPhone,
+            addrFrom: convertingPickup.addrFrom,
+            pkgDesc: convertingPickup.pkgDesc,
+            city: convertingPickup.city,
+          }}
+        />
+      )}
       {editItem && <EditItemModal item={editItem} onClose={() => setEditItem(null)} onSaved={refresh} />}
       {splashTheme && <ThemeSplash theme={splashTheme} onDone={() => setSplashTheme(null)} />}
       {themeMenuOpen && (

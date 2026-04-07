@@ -38,19 +38,40 @@ function saveContact(phone: string, name: string, addr: string) {
   localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
 }
 
+interface PrefillData {
+  senderName?: string;
+  senderPhone?: string;
+  addrFrom?: string;
+  pkgDesc?: string;
+  city?: string;
+}
+
 interface Props {
   onClose: () => void;
   onAdded: () => void;
   defaultType?: 'пасажир' | 'посилка';
+  forceShipping?: boolean;
+  prefill?: PrefillData;
 }
 
-export function AddItemModal({ onClose, onAdded, defaultType = 'посилка' }: Props) {
+export function AddItemModal({ onClose, onAdded, defaultType = 'посилка', forceShipping = false, prefill }: Props) {
   const { currentSheet, isUnifiedView, routes, driverName, shippingRoutes, showToast } = useApp();
 
-  const [itemType, setItemType] = useState<'пасажир' | 'посилка'>(defaultType);
+  const [itemType, setItemType] = useState<'пасажир' | 'посилка'>(forceShipping ? 'посилка' : defaultType);
   const [selectedRoute, setSelectedRoute] = useState(isUnifiedView ? routes[0]?.name || '' : currentSheet);
   const [submitting, setSubmitting] = useState(false);
   const [direction, setDirection] = useState<'отримання' | 'відправка'>('відправка');
+
+  // Apply prefill once on mount
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.senderName) setSenderName(prefill.senderName);
+    if (prefill.senderPhone) setSenderPhone(prefill.senderPhone);
+    if (prefill.addrFrom) setAddrFrom(prefill.addrFrom);
+    if (prefill.pkgDesc) setPkgDesc(prefill.pkgDesc);
+    if (prefill.city) setCity(prefill.city);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Common fields
   const [dateTrip, setDateTrip] = useState('');
@@ -441,6 +462,7 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка' 
           {itemType === 'посилка' && (
             <>
               {/* Direction toggle */}
+              {!forceShipping && (
               <div className="flex gap-2">
                 <button onClick={() => setDirection('отримання')}
                   className={`flex-1 py-2 rounded-xl text-[12px] font-bold text-center cursor-pointer transition-all ${
@@ -455,6 +477,7 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка' 
                   <Send className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />Відправка
                 </button>
               </div>
+              )}
 
               {/* ===== ВІДПРАВКА FORM ===== */}
               {isShipping ? (
