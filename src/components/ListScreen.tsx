@@ -139,6 +139,9 @@ export function ListScreen() {
   const filteredPassengers = searchIn(filterItems(passengers), ['name', 'phone', 'addrFrom', 'addrTo', 'itemId']);
   const filteredPackages = searchIn(filterItems(packages), ['recipientName', 'recipientPhone', 'senderName', 'recipientAddr', 'ttn', 'itemId']);
   const filteredShipping = searchIn(filterItems(shippingItems), ['senderName', 'recipientName', 'recipientPhone', 'recipientAddr', 'dispatchId']);
+  // У табі "Усі": ховаємо виконані та записи Відправки (їх видно тільки в Посилки→Відправка)
+  const allTabPassengers = filteredPassengers.filter((p) => getStatus(p._statusKey) !== 'completed');
+  const allTabPackages = filteredPackages.filter((p) => getStatus(p._statusKey) !== 'completed');
   const currentItems = viewTab === 'passengers' || viewTab === 'all' ? filteredPassengers : viewTab === 'packages' ? filteredPackages : [];
 
   // Stats
@@ -315,41 +318,29 @@ export function ListScreen() {
             <ShippingCard key={item._statusKey || `ship_${item.rowNum}_${i}`} item={item} index={i} onEdit={setEditItem} />
           ))
         ) : showAllTab ? (
-          (filteredPassengers.length === 0 && filteredPackages.length === 0 && filteredShipping.length === 0) ? <Empty /> : (
+          (allTabPassengers.length === 0 && allTabPackages.length === 0) ? <Empty /> : (
             <>
-              {filteredPassengers.length > 0 && (
+              {allTabPassengers.length > 0 && (
                 <>
                   <div className="flex items-center gap-2 px-1">
                     <Users className="w-4 h-4 text-brand" />
                     <span className="text-xs font-bold text-text">Пасажири</span>
-                    <span className="text-[10px] font-bold text-muted bg-gray-100 px-2 py-0.5 rounded-full">{filteredPassengers.length}</span>
+                    <span className="text-[10px] font-bold text-muted bg-gray-100 px-2 py-0.5 rounded-full">{allTabPassengers.length}</span>
                   </div>
-                  {filteredPassengers.map((p, i) => (
+                  {allTabPassengers.map((p, i) => (
                     <PassengerCard key={p._statusKey} passenger={p} index={i} searchQuery={searchQuery} onEdit={setEditItem} />
                   ))}
                 </>
               )}
-              {filteredPackages.length > 0 && (
+              {allTabPackages.length > 0 && (
                 <>
                   <div className="flex items-center gap-2 px-1 mt-2">
                     <Package className="w-4 h-4 text-brand" />
                     <span className="text-xs font-bold text-text">Посилки</span>
-                    <span className="text-[10px] font-bold text-muted bg-gray-100 px-2 py-0.5 rounded-full">{filteredPackages.length}</span>
+                    <span className="text-[10px] font-bold text-muted bg-gray-100 px-2 py-0.5 rounded-full">{allTabPackages.length}</span>
                   </div>
-                  {filteredPackages.map((p, i) => (
+                  {allTabPackages.map((p, i) => (
                     <PackageCard key={p._statusKey} pkg={p} index={i} searchQuery={searchQuery} onEdit={setEditItem} />
-                  ))}
-                </>
-              )}
-              {filteredShipping.length > 0 && (
-                <>
-                  <div className="flex items-center gap-2 px-1 mt-2">
-                    <Truck className="w-4 h-4 text-blue-500" />
-                    <span className="text-xs font-bold text-text">Відправка</span>
-                    <span className="text-[10px] font-bold text-muted bg-gray-100 px-2 py-0.5 rounded-full">{filteredShipping.length}</span>
-                  </div>
-                  {filteredShipping.map((item, i) => (
-                    <ShippingCard key={item._statusKey || `ship_${item.rowNum}_${i}`} item={item} index={i} onEdit={setEditItem} />
                   ))}
                 </>
               )}
