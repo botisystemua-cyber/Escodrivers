@@ -75,11 +75,7 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvert
             </span>
           </div>
         )}
-        <div className="flex items-center gap-2 mb-1 cursor-pointer" onClick={() => {
-          const addr = dirKind === 'eu-ua' ? p.addrFrom : p.recipientAddr;
-          if (addr) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`, '_blank');
-          else showToast('Немає адреси');
-        }}>
+        <div className="flex items-center gap-2 mb-1">
           <span className="relative w-7 h-7 rounded-lg bg-gray-100 text-secondary flex items-center justify-center text-[11px] font-black shrink-0">
             {index + 1}
             <span className="absolute -bottom-0.5 -right-0.5 text-[10px] leading-none">📦</span>
@@ -101,7 +97,11 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvert
 
         <div className="flex gap-2 mb-2">
           <Btn icon={Phone} label="Дзвонити" color="bg-green-50 text-green-700" onClick={() => { if (p.recipientPhone) window.location.href = `tel:${p.recipientPhone}`; else showToast('Немає телефону'); }} />
-          <Btn icon={MapPin} label="Звідки" color="bg-blue-50 text-blue-700" onClick={() => { if (p.addrFrom) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(p.addrFrom)}&travelmode=driving`, '_blank'); else showToast('Немає адреси відправки'); }} />
+          <Btn icon={MapPin} label="Куди" color="bg-blue-50 text-blue-700" onClick={() => {
+            const addr = dirKind === 'eu-ua' ? p.addrFrom : p.recipientAddr;
+            if (addr) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`, '_blank');
+            else showToast('Немає адреси');
+          }} />
           <Btn icon={MapPin} label="Куди" color="bg-blue-50 text-blue-700" onClick={navigate} />
           <Btn icon={expanded ? ChevronUp : Info} label={expanded ? 'Згорнути' : 'Деталі'} color={expanded ? 'bg-brand/10 text-brand' : 'bg-gray-50 text-gray-600'} onClick={() => setExpanded(!expanded)} />
         </div>

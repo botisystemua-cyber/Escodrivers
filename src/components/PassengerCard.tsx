@@ -77,7 +77,7 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
             </span>
           </div>
         )}
-        <div className="flex items-center gap-2.5 mb-2 cursor-pointer" onClick={() => { if (p.addrFrom || p.addrTo) setShowAddrPicker(true); else showToast('Немає адрес'); }}>
+        <div className="flex items-center gap-2.5 mb-2">
           <span className="relative w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black shrink-0">
             {index + 1}
             <User className="w-2.5 h-2.5 absolute -bottom-0.5 -right-0.5 bg-blue-100 rounded-full p-0.5 box-content" />
@@ -107,7 +107,7 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
         <div className="flex gap-2 mb-2">
           <Btn icon={Phone} label="Дзвонити" color="bg-green-50 text-green-700" onClick={() => { if (p.phone) window.location.href = `tel:${p.phone}`; else showToast('Немає телефону'); }} />
           <Btn icon={MessageCircle} label="Написати" color="bg-purple-50 text-purple-700" onClick={() => { if (p.phone) setShowMessenger(true); else showToast('Немає телефону'); }} />
-          <Btn icon={MapPin} label="Куди" color="bg-blue-50 text-blue-700" onClick={() => nav(p.addrTo)} />
+          <Btn icon={MapPin} label="Куди" color="bg-blue-50 text-blue-700" onClick={() => { if (p.addrFrom || p.addrTo) setShowAddrPicker(true); else showToast('Немає адрес'); }} />
           <Btn icon={expanded ? ChevronUp : Info} label={expanded ? 'Згорнути' : 'Деталі'} color={expanded ? 'bg-brand/10 text-brand' : 'bg-gray-50 text-gray-600'} onClick={() => setExpanded(!expanded)} />
         </div>
 
