@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import {
   Phone, MapPin, RotateCw, CheckCircle2, XCircle, Undo2,
-  Car, ArrowRight, Info, ChevronUp, CreditCard, Calendar, Clock, Users, User, Pencil,
+  Car, ArrowRight, Info, ChevronUp, CreditCard, Calendar, Clock, Users, User, Pencil, MessageCircle,
 } from 'lucide-react';
 import type { Passenger, ItemStatus } from '../types';
 import { useApp } from '../store/useAppStore';
 import { updateItemStatus } from '../api';
 import { Highlight } from './Highlight';
 import { isUaEu, isEuUa } from '../utils/smsParser';
+import { MessengerPopup } from './MessengerPopup';
 
 interface Props { passenger: Passenger; index: number; searchQuery?: string; onEdit?: (p: Passenger) => void; }
 
@@ -28,6 +29,7 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [expanded, setExpanded] = useState(false);
+  const [showMessenger, setShowMessenger] = useState(false);
 
   const show = (col: string) => !hiddenCols.has(col);
   const rawStatus = getStatus(p._statusKey);
@@ -102,7 +104,7 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
 
         <div className="flex gap-2 mb-2">
           <Btn icon={Phone} label="Дзвонити" color="bg-green-50 text-green-700" onClick={() => { if (p.phone) window.location.href = `tel:${p.phone}`; else showToast('Немає телефону'); }} />
-          <Btn icon={Car} label="Звідки" color="bg-blue-50 text-blue-700" onClick={() => nav(p.addrFrom)} />
+          <Btn icon={MessageCircle} label="Написати" color="bg-purple-50 text-purple-700" onClick={() => { if (p.phone) setShowMessenger(true); else showToast('Немає телефону'); }} />
           <Btn icon={MapPin} label="Куди" color="bg-blue-50 text-blue-700" onClick={() => nav(p.addrTo)} />
           <Btn icon={expanded ? ChevronUp : Info} label={expanded ? 'Згорнути' : 'Деталі'} color={expanded ? 'bg-brand/10 text-brand' : 'bg-gray-50 text-gray-600'} onClick={() => setExpanded(!expanded)} />
         </div>
@@ -146,6 +148,8 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
           {p.smsNote && <div className="mt-1.5 px-2.5 py-1.5 rounded-lg bg-blue-50 text-[11px] text-text"><span className="text-blue-600 font-bold">SMS: </span>{p.smsNote}</div>}
         </div>
       )}
+
+      {showMessenger && <MessengerPopup phone={p.phone} onClose={() => setShowMessenger(false)} />}
 
       {showCancel && (
         <div className="border-t border-red-100 bg-red-50/60 p-3.5">
