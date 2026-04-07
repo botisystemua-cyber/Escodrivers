@@ -146,7 +146,7 @@ export function ListScreen() {
 
   // Stats
   const allStatsItems: { _statusKey: string; _sourceRoute?: string }[] = viewTab === 'all'
-    ? [...passengers, ...packages, ...shippingItems]
+    ? [...passengers, ...packages]
     : viewTab === 'allPackages' ? [...packages, ...shippingItems]
     : viewTab === 'shipping' ? shippingItems
     : viewTab === 'passengers' ? passengers : packages;
@@ -160,7 +160,7 @@ export function ListScreen() {
     cancelled: statsBase.filter((i) => getStatus(i._statusKey) === 'cancelled').length,
   };
 
-  const countSource: { _sourceRoute?: string }[] = viewTab === 'all' ? [...passengers, ...packages, ...shippingItems] : viewTab === 'allPackages' ? [...packages, ...shippingItems] : viewTab === 'shipping' ? shippingItems : viewTab === 'passengers' ? passengers : packages;
+  const countSource: { _sourceRoute?: string }[] = viewTab === 'all' ? [...passengers, ...packages] : viewTab === 'allPackages' ? [...packages, ...shippingItems] : viewTab === 'shipping' ? shippingItems : viewTab === 'passengers' ? passengers : packages;
   const routeTabs = isUnifiedView
     ? [{ name: 'all', label: 'Усі', count: countSource.length },
        ...routes.map((r) => ({ name: r.name, label: r.name.replace('Маршрут_', 'М'), count: countSource.filter((i) => i._sourceRoute === r.name).length }))]
