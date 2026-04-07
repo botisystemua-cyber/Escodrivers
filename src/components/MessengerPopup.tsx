@@ -37,7 +37,6 @@ export function MessengerPopup({ phone, onClose }: Props) {
           <>
             <Btn href={`https://wa.me/${cleanNoPlus}`} bg="#25d366">📱 WhatsApp (звичайний)</Btn>
             <Btn href={`whatsapp-business://send?phone=${cleanNoPlus}`} bg="#075e54">💼 WhatsApp Business</Btn>
-            <Btn href={`https://api.whatsapp.com/send?phone=${cleanNoPlus}`} bg="#128c7e">🌐 WhatsApp Web</Btn>
             <Btn bg="#94a3b8" onClick={() => setWaOpen(false)}>← Назад</Btn>
           </>
         )}
