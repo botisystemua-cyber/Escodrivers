@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ArrowLeft, RefreshCw, Package, Users, Truck, BarChart3,
   ListFilter, LayoutGrid, Search, X,
@@ -31,6 +31,7 @@ export function ListScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editItem, setEditItem] = useState<RouteItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [hidingCompleted, setHidingCompleted] = useState(false);
 
   const routeNum = currentSheet.replace('Маршрут_', '');
   const shippingSheetName = shippingRoutes.find((s) => s.name === 'Відправка_' + routeNum)?.name || '';
@@ -142,6 +143,18 @@ export function ListScreen() {
   // У табі "Усі": ховаємо виконані та записи Відправки (їх видно тільки в Посилки→Відправка)
   const allTabPassengers = statusFilter === 'completed' ? filteredPassengers : filteredPassengers.filter((p) => getStatus(p._statusKey) !== 'completed');
   const allTabPackages = statusFilter === 'completed' ? filteredPackages : filteredPackages.filter((p) => getStatus(p._statusKey) !== 'completed');
+  const allTabTotal = allTabPassengers.length + allTabPackages.length;
+
+  const prevAllTotalRef = useRef(allTabTotal);
+  useEffect(() => {
+    if (showAllTab && allTabTotal < prevAllTotalRef.current) {
+      setHidingCompleted(true);
+      const t = setTimeout(() => setHidingCompleted(false), 500);
+      prevAllTotalRef.current = allTabTotal;
+      return () => clearTimeout(t);
+    }
+    prevAllTotalRef.current = allTabTotal;
+  }, [allTabTotal, showAllTab]);
   const currentItems = viewTab === 'passengers' || viewTab === 'all' ? filteredPassengers : viewTab === 'packages' ? filteredPackages : [];
 
   // Stats
@@ -318,7 +331,12 @@ export function ListScreen() {
             <ShippingCard key={item._statusKey || `ship_${item.rowNum}_${i}`} item={item} index={i} onEdit={setEditItem} />
           ))
         ) : showAllTab ? (
-          (allTabPassengers.length === 0 && allTabPackages.length === 0) ? <Empty /> : (
+          hidingCompleted ? (
+            <div className="flex flex-col items-center justify-center py-16">
+              <RefreshCw className="w-7 h-7 text-brand animate-spin mb-3" />
+              <p className="text-muted text-sm">Оновлення...</p>
+            </div>
+          ) : (allTabPassengers.length === 0 && allTabPackages.length === 0) ? <Empty /> : (
             <>
               {allTabPassengers.length > 0 && (
                 <>
