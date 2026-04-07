@@ -6,6 +6,7 @@ import {
 import { useApp } from '../store/useAppStore';
 import { ThemeSplash } from './ThemeSplash';
 import type { Theme } from '../store/useAppStore';
+import { isUaEu, isEuUa } from '../utils/smsParser';
 import { fetchPassengers, fetchPackages, fetchShippingItems } from '../api';
 import { PassengerCard } from './PassengerCard';
 import { PackageCard } from './PackageCard';
@@ -56,11 +57,15 @@ export function ListScreen() {
   const hasShipping = !!shippingSheetName || isUnifiedView;
 
   const isPackagesMode = viewTab === 'packages' || viewTab === 'shipping' || viewTab === 'allPackages';
-  const activeMainTab: 'all' | 'passengers' | 'packages' = viewTab === 'all' ? 'all' : isPackagesMode ? 'packages' : 'passengers';
+  const isPassengersMode = viewTab === 'passengers' || viewTab === 'paxUaEu' || viewTab === 'paxEuUa';
+  const activeMainTab: 'all' | 'passengers' | 'packages' = viewTab === 'all' ? 'all' : isPackagesMode ? 'packages' : isPassengersMode ? 'passengers' : 'passengers';
 
   // Load data for current tab only
   const loadCurrentTab = useCallback(async (tab: ViewTab, force = false) => {
-    const tabsToLoad: ViewTab[] = tab === 'all' ? ['passengers', 'packages', 'shipping'] : tab === 'allPackages' ? ['packages', 'shipping'] : [tab];
+    const tabsToLoad: ViewTab[] = tab === 'all' ? ['passengers', 'packages', 'shipping']
+      : tab === 'allPackages' ? ['packages', 'shipping']
+      : (tab === 'paxUaEu' || tab === 'paxEuUa') ? ['passengers']
+      : [tab];
     const needsLoad = tabsToLoad.some((t) => force || !loadedTabs.has(t));
     if (!needsLoad) return;
 
@@ -155,7 +160,10 @@ export function ListScreen() {
     return items.filter((item) => fields.some((f) => String((item as any)[f] || '').toLowerCase().includes(q)));
   };
 
-  const filteredPassengers = searchIn(filterItems(passengers), ['name', 'phone', 'addrFrom', 'addrTo', 'itemId']);
+  const filteredPassengersAll = searchIn(filterItems(passengers), ['name', 'phone', 'addrFrom', 'addrTo', 'itemId']);
+  const filteredPassengers = viewTab === 'paxUaEu' ? filteredPassengersAll.filter((p) => isUaEu(p.direction))
+    : viewTab === 'paxEuUa' ? filteredPassengersAll.filter((p) => isEuUa(p.direction))
+    : filteredPassengersAll;
   const filteredPackages = searchIn(filterItems(packages), ['recipientName', 'recipientPhone', 'senderName', 'recipientAddr', 'ttn', 'itemId']);
   const filteredShipping = searchIn(filterItems(shippingItems), ['senderName', 'recipientName', 'recipientPhone', 'recipientAddr', 'dispatchId']);
   // У табі "Усі": ховаємо виконані та записи Відправки (їх видно тільки в Посилки→Відправка)
@@ -173,13 +181,15 @@ export function ListScreen() {
     }
     prevAllTotalRef.current = allTabTotal;
   }, [allTabTotal, viewTab]);
-  const currentItems = viewTab === 'passengers' || viewTab === 'all' ? filteredPassengers : viewTab === 'packages' ? filteredPackages : [];
+  const currentItems = isPassengersMode || viewTab === 'all' ? filteredPassengers : viewTab === 'packages' ? filteredPackages : [];
 
   // Stats
   const allStatsItems: { _statusKey: string; _sourceRoute?: string }[] = viewTab === 'all'
     ? [...passengers, ...packages]
     : viewTab === 'allPackages' ? [...packages, ...shippingItems]
     : viewTab === 'shipping' ? shippingItems
+    : viewTab === 'paxUaEu' ? passengers.filter((p) => isUaEu(p.direction))
+    : viewTab === 'paxEuUa' ? passengers.filter((p) => isEuUa(p.direction))
     : viewTab === 'passengers' ? passengers : packages;
   const statsBase = isUnifiedView && routeFilter !== 'all'
     ? allStatsItems.filter((i) => i._sourceRoute === routeFilter) : allStatsItems;
@@ -253,7 +263,7 @@ export function ListScreen() {
         {/* Main tabs */}
         <div className="flex gap-2 mb-2.5">
           {mainTabs.map((t) => (
-            <button key={t.key} onClick={() => setViewTab(t.key === 'packages' && hasShipping ? 'allPackages' : t.key)}
+            <button key={t.key} onClick={() => setViewTab(t.key === 'packages' && hasShipping ? 'allPackages' : t.key === 'passengers' ? 'passengers' : t.key)}
               className={`flex-1 py-2.5 rounded-xl text-[13px] font-bold text-center cursor-pointer transition-all ${
                 activeMainTab === t.key ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-400'
               }`}>
@@ -276,6 +286,24 @@ export function ListScreen() {
             <button onClick={() => setViewTab('shipping')}
               className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'shipping' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400'}`}>
               <Truck className="w-3 h-3 inline mr-1 -mt-0.5" />Відправка
+            </button>
+          </div>
+        )}
+
+        {/* Sub-tabs: Усі | UA→EU | EU→UA */}
+        {isPassengersMode && (
+          <div className="flex items-center gap-1 mb-2 bg-gray-100 rounded-lg p-0.5">
+            <button onClick={() => setViewTab('passengers')}
+              className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'passengers' ? 'bg-white text-text shadow-sm' : 'text-gray-400'}`}>
+              <LayoutGrid className="w-3 h-3 inline mr-1 -mt-0.5" />Усі
+            </button>
+            <button onClick={() => setViewTab('paxUaEu')}
+              className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'paxUaEu' ? 'bg-white text-text shadow-sm' : 'text-gray-400'}`}>
+              🇺🇦→🇪🇺 УК-ЄВР
+            </button>
+            <button onClick={() => setViewTab('paxEuUa')}
+              className={`flex-1 py-1.5 rounded-md text-[11px] font-semibold text-center cursor-pointer transition-all ${viewTab === 'paxEuUa' ? 'bg-white text-text shadow-sm' : 'text-gray-400'}`}>
+              🇪🇺→🇺🇦 ЄВР-УК
             </button>
           </div>
         )}
@@ -388,7 +416,7 @@ export function ListScreen() {
               )}
             </>
           )
-        ) : viewTab === 'passengers' ? (
+        ) : isPassengersMode ? (
           currentItems.length === 0 ? <Empty /> : (currentItems as Passenger[]).map((p, i) => (
             <PassengerCard key={p._statusKey} passenger={p} index={i} searchQuery={searchQuery} onEdit={setEditItem} />
           ))
@@ -410,7 +438,7 @@ export function ListScreen() {
 
       {/* Modals */}
       {showColumnEditor && <ColumnEditor onClose={() => setShowColumnEditor(false)} />}
-      {showAddModal && <AddItemModal onClose={() => setShowAddModal(false)} onAdded={refresh} />}
+      {showAddModal && <AddItemModal onClose={() => setShowAddModal(false)} onAdded={refresh} defaultType={isPassengersMode ? 'пасажир' : 'посилка'} />}
       {editItem && <EditItemModal item={editItem} onClose={() => setEditItem(null)} onSaved={refresh} />}
       {splashTheme && <ThemeSplash theme={splashTheme} onDone={() => setSplashTheme(null)} />}
       {themeMenuOpen && (

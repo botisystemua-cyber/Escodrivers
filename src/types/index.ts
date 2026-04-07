@@ -104,7 +104,7 @@ export type RouteType = 'route';  // one type now — route contains both pax + 
 
 export type StatusFilter = 'all' | ItemStatus;
 
-export type ViewTab = 'all' | 'passengers' | 'packages' | 'shipping' | 'allPackages';
+export type ViewTab = 'all' | 'passengers' | 'packages' | 'shipping' | 'allPackages' | 'paxUaEu' | 'paxEuUa';
 
 export type ExpenseCategory = 'fuel' | 'food' | 'parking' | 'toll' | 'fine' | 'customs' | 'topUp' | 'other' | 'tips';
 

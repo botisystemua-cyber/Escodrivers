@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, UserPlus, Package, Send, Hash, Search } from 'lucide-react';
 import { useApp } from '../store/useAppStore';
 import { addRouteItem, fetchPackages, fetchShippingItems } from '../api';
+import { parseSmsText, directionToNapryam } from '../utils/smsParser';
 
 // Predefined cargo descriptions for autocomplete
 const CARGO_SUGGESTIONS = [
@@ -40,12 +41,13 @@ function saveContact(phone: string, name: string, addr: string) {
 interface Props {
   onClose: () => void;
   onAdded: () => void;
+  defaultType?: 'пасажир' | 'посилка';
 }
 
-export function AddItemModal({ onClose, onAdded }: Props) {
+export function AddItemModal({ onClose, onAdded, defaultType = 'посилка' }: Props) {
   const { currentSheet, isUnifiedView, routes, driverName, shippingRoutes, showToast } = useApp();
 
-  const [itemType, setItemType] = useState<'пасажир' | 'посилка'>('посилка');
+  const [itemType, setItemType] = useState<'пасажир' | 'посилка'>(defaultType);
   const [selectedRoute, setSelectedRoute] = useState(isUnifiedView ? routes[0]?.name || '' : currentSheet);
   const [submitting, setSubmitting] = useState(false);
   const [direction, setDirection] = useState<'отримання' | 'відправка'>('відправка');
@@ -66,6 +68,13 @@ export function AddItemModal({ onClose, onAdded }: Props) {
   const [seatsCount, setSeatsCount] = useState('1');
   const [baggageWeight, setBaggageWeight] = useState('');
   const [timing, setTiming] = useState('');
+  const [paxDirection, setPaxDirection] = useState<'ua-eu' | 'eu-ua'>('ua-eu');
+  const [phoneReg, setPhoneReg] = useState('');
+  const [paxDeposit, setPaxDeposit] = useState('');
+  const [paxDepositCurrency, setPaxDepositCurrency] = useState('UAH');
+  const [weightPrice, setWeightPrice] = useState('');
+  const [smsText, setSmsText] = useState('');
+  const [smsLog, setSmsLog] = useState<string>('');
 
   // Package fields (shared between отримання and відправка)
   const [senderName, setSenderName] = useState('');
@@ -186,12 +195,20 @@ export function AddItemModal({ onClose, onAdded }: Props) {
       };
 
       if (itemType === 'пасажир') {
+        data.direction = directionToNapryam(paxDirection);
         data.dateTrip = dateTrip;
         data.city = city;
         data.amount = amount;
         data.currency = currency;
         data.payForm = payForm;
-        data.note = note;
+        // Extra fields not yet in DB columns — append to note
+        const extra: string[] = [];
+        if (phoneReg) extra.push('Тел.рег: ' + phoneReg);
+        if (paxDeposit) extra.push('Завдаток: ' + paxDeposit + ' ' + paxDepositCurrency);
+        if (weightPrice) extra.push('Ціна багажу: ' + weightPrice);
+        data.note = [note, ...extra].filter(Boolean).join(' | ');
+        data.deposit = paxDeposit;
+        data.depositCurrency = paxDepositCurrency;
         data.name = name;
         data.phone = phone;
         data.addrFrom = addrFrom;
@@ -294,12 +311,59 @@ export function AddItemModal({ onClose, onAdded }: Props) {
           {/* ===== PASSENGER FORM ===== */}
           {itemType === 'пасажир' && (
             <>
+              {/* SMS parser */}
+              <div className="bg-purple-50 border border-purple-200 rounded-xl p-2.5">
+                <label className="block text-[10px] font-bold text-purple-700 uppercase mb-1.5">📋 Вставте текст замовлення</label>
+                <textarea
+                  value={smsText}
+                  onChange={(e) => setSmsText(e.target.value)}
+                  rows={3}
+                  placeholder="Наприклад: 12.03 два пасажири Київ-Цюріх +380639763484 Іваненко Петро"
+                  className="w-full px-2.5 py-2 bg-white border border-purple-200 rounded-lg text-[12px] text-text focus:outline-none focus:border-purple-400 resize-y"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const r = parseSmsText(smsText);
+                    if (r.name) setName(r.name);
+                    if (r.phone) setPhone(r.phone);
+                    if (r.date) setDateTrip(r.date);
+                    if (r.seats) setSeatsCount(String(r.seats));
+                    if (r.fromValue) setAddrFrom(r.fromValue);
+                    if (r.toValue) setAddrTo(r.toValue);
+                    if (r.timing) setTiming(r.timing);
+                    if (r.direction) setPaxDirection(r.direction);
+                    setSmsLog(r.log.length ? '✅ ' + r.log.join(' · ') : '⚠️ Не вдалось розпізнати');
+                  }}
+                  className="w-full mt-1.5 py-2 bg-gradient-to-r from-purple-600 to-purple-400 text-white rounded-lg text-[11px] font-bold cursor-pointer active:scale-95"
+                >🔍 Розпізнати та заповнити</button>
+                {smsLog && <div className="mt-1.5 text-[10px] font-semibold text-purple-700">{smsLog}</div>}
+              </div>
+
+              {/* Direction */}
+              <div>
+                <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Напрямок *</label>
+                <div className="flex gap-1.5">
+                  <button type="button" onClick={() => setPaxDirection('ua-eu')}
+                    className={`flex-1 py-2 rounded-xl text-[11px] font-bold cursor-pointer transition-all ${
+                      paxDirection === 'ua-eu' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-400'
+                    }`}>🇺🇦→🇪🇺 Україна-ЄВ</button>
+                  <button type="button" onClick={() => setPaxDirection('eu-ua')}
+                    className={`flex-1 py-2 rounded-xl text-[11px] font-bold cursor-pointer transition-all ${
+                      paxDirection === 'eu-ua' ? 'bg-brand text-white shadow-sm' : 'bg-gray-100 text-gray-400'
+                    }`}>🇪🇺→🇺🇦 Європа-УК</button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Дата рейсу" value={dateTrip} onChange={setDateTrip} type="date" />
                 <Field label="Місто" value={city} onChange={setCity} placeholder="Київ" />
               </div>
               <Field label="ПІБ *" value={name} onChange={setName} placeholder="Іванов Іван" />
-              <Field label="Телефон" value={phone} onChange={setPhone} placeholder="+380..." type="tel" />
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Телефон пасажира" value={phone} onChange={setPhone} placeholder="+380..." type="tel" />
+                <Field label="Тел. реєстратора" value={phoneReg} onChange={setPhoneReg} placeholder="+380..." type="tel" />
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <Field label="Звідки" value={addrFrom} onChange={setAddrFrom} placeholder="Адреса" />
                 <Field label="Куди" value={addrTo} onChange={setAddrTo} placeholder="Адреса" />
@@ -307,7 +371,24 @@ export function AddItemModal({ onClose, onAdded }: Props) {
               <div className="grid grid-cols-3 gap-2">
                 <Field label="Місць" value={seatsCount} onChange={setSeatsCount} type="number" />
                 <Field label="Вага багажу" value={baggageWeight} onChange={setBaggageWeight} placeholder="кг" type="number" />
-                <Field label="Таймінг" value={timing} onChange={setTiming} placeholder="08:00" />
+                <Field label="Ціна багажу" value={weightPrice} onChange={setWeightPrice} placeholder="0" type="number" />
+              </div>
+              <Field label="Таймінг" value={timing} onChange={setTiming} placeholder="08:00" />
+
+              {/* Deposit */}
+              <div className="grid grid-cols-2 gap-2">
+                <Field label="Завдаток" value={paxDeposit} onChange={setPaxDeposit} placeholder="0" type="number" />
+                <div>
+                  <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Валюта завдатку</label>
+                  <select value={paxDepositCurrency} onChange={(e) => setPaxDepositCurrency(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text focus:outline-none focus:border-brand">
+                    <option value="UAH">UAH</option>
+                    <option value="EUR">EUR</option>
+                    <option value="CHF">CHF</option>
+                    <option value="USD">USD</option>
+                    <option value="PLN">PLN</option>
+                  </select>
+                </div>
               </div>
 
               {/* Payment section */}
