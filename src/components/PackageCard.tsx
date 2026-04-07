@@ -7,6 +7,7 @@ import type { Package, ItemStatus } from '../types';
 import { useApp } from '../store/useAppStore';
 import { updateItemStatus } from '../api';
 import { Highlight } from './Highlight';
+import { isUaEu, isEuUa } from '../utils/smsParser';
 
 interface Props { pkg: Package; index: number; searchQuery?: string; onEdit?: (p: Package) => void; }
 
@@ -34,6 +35,13 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit }: Props) 
   const canUndo = status === 'completed' || status === 'cancelled';
   const routeName = isUnifiedView && p._sourceRoute ? p._sourceRoute : currentSheet;
   const sl = stLabel[status];
+  const dirKind: 'ua-eu' | 'eu-ua' | null = isUaEu(p.direction) ? 'ua-eu' : isEuUa(p.direction) ? 'eu-ua' : null;
+  const dirBar = dirKind === 'ua-eu' ? 'border-l-emerald-500' : dirKind === 'eu-ua' ? 'border-l-orange-500' : 'border-l-gray-300';
+  const dirBadge = dirKind === 'ua-eu'
+    ? { label: '🇺🇦→🇪🇺 Видача', cls: 'bg-emerald-50 text-emerald-700' }
+    : dirKind === 'eu-ua'
+    ? { label: '🇪🇺→🇺🇦 Забір', cls: 'bg-orange-50 text-orange-700' }
+    : null;
 
   const doStatus = async (ns: ItemStatus) => {
     setStatus(p._statusKey, ns);
@@ -57,8 +65,16 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit }: Props) 
   };
 
   return (
-    <div className={`bg-card rounded-2xl border-2 border-gray-300 ${borderColor[status]} border-l-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden`}>
+    <div className={`bg-card rounded-2xl border-2 border-gray-300 ${dirBar} border-l-[6px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden`}>
+      <div className={`h-0.5 ${borderColor[status].replace('border-l-', 'bg-')}`} />
       <div className="px-3 py-2.5">
+        {dirBadge && (
+          <div className="mb-1.5">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${dirBadge.cls}`}>
+              {dirBadge.label}
+            </span>
+          </div>
+        )}
         <div className="flex items-center gap-2 mb-1">
           <span className="relative w-7 h-7 rounded-lg bg-gray-100 text-secondary flex items-center justify-center text-[11px] font-black shrink-0">
             {index + 1}
