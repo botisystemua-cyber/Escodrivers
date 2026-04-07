@@ -75,7 +75,11 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvert
             </span>
           </div>
         )}
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 cursor-pointer" onClick={() => {
+          const addr = dirKind === 'eu-ua' ? p.addrFrom : p.recipientAddr;
+          if (addr) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`, '_blank');
+          else showToast('Немає адреси');
+        }}>
           <span className="relative w-7 h-7 rounded-lg bg-gray-100 text-secondary flex items-center justify-center text-[11px] font-black shrink-0">
             {index + 1}
             <span className="absolute -bottom-0.5 -right-0.5 text-[10px] leading-none">📦</span>

@@ -9,6 +9,7 @@ import { updateItemStatus } from '../api';
 import { Highlight } from './Highlight';
 import { isUaEu, isEuUa } from '../utils/smsParser';
 import { MessengerPopup } from './MessengerPopup';
+import { AddressPicker } from './AddressPicker';
 
 interface Props { passenger: Passenger; index: number; searchQuery?: string; onEdit?: (p: Passenger) => void; }
 
@@ -30,6 +31,7 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
   const [cancelReason, setCancelReason] = useState('');
   const [expanded, setExpanded] = useState(false);
   const [showMessenger, setShowMessenger] = useState(false);
+  const [showAddrPicker, setShowAddrPicker] = useState(false);
 
   const show = (col: string) => !hiddenCols.has(col);
   const rawStatus = getStatus(p._statusKey);
@@ -75,7 +77,7 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
             </span>
           </div>
         )}
-        <div className="flex items-center gap-2.5 mb-2">
+        <div className="flex items-center gap-2.5 mb-2 cursor-pointer" onClick={() => { if (p.addrFrom || p.addrTo) setShowAddrPicker(true); else showToast('Немає адрес'); }}>
           <span className="relative w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black shrink-0">
             {index + 1}
             <User className="w-2.5 h-2.5 absolute -bottom-0.5 -right-0.5 bg-blue-100 rounded-full p-0.5 box-content" />
@@ -150,6 +152,7 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
       )}
 
       {showMessenger && <MessengerPopup phone={p.phone} onClose={() => setShowMessenger(false)} />}
+      {showAddrPicker && <AddressPicker addrFrom={p.addrFrom} addrTo={p.addrTo} onClose={() => setShowAddrPicker(false)} />}
 
       {showCancel && (
         <div className="border-t border-red-100 bg-red-50/60 p-3.5">
