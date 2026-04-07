@@ -447,7 +447,7 @@ export function ListScreen() {
 
       {/* Modals */}
       {showColumnEditor && <ColumnEditor onClose={() => setShowColumnEditor(false)} />}
-      {showAddModal && <AddItemModal onClose={() => setShowAddModal(false)} onAdded={refresh} defaultType={isPassengersMode ? 'пасажир' : 'посилка'} />}
+      {showAddModal && <AddItemModal onClose={() => setShowAddModal(false)} onAdded={refresh} defaultType="посилка" />}
       {convertingPickup && (
         <AddItemModal
           onClose={() => setConvertingPickup(null)}
