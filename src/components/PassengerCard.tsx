@@ -7,6 +7,7 @@ import type { Passenger, ItemStatus } from '../types';
 import { useApp } from '../store/useAppStore';
 import { updateItemStatus } from '../api';
 import { Highlight } from './Highlight';
+import { isUaEu, isEuUa } from '../utils/smsParser';
 
 interface Props { passenger: Passenger; index: number; searchQuery?: string; onEdit?: (p: Passenger) => void; }
 
@@ -34,6 +35,12 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
   const canUndo = status === 'completed' || status === 'cancelled';
   const routeName = isUnifiedView && p._sourceRoute ? p._sourceRoute : currentSheet;
   const sl = stLabel[status];
+  const dirKind: 'ua-eu' | 'eu-ua' | null = isUaEu(p.direction) ? 'ua-eu' : isEuUa(p.direction) ? 'eu-ua' : null;
+  const dirBadge = dirKind === 'ua-eu'
+    ? { label: 'UA → EU', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' }
+    : dirKind === 'eu-ua'
+    ? { label: 'EU → UA', cls: 'bg-orange-100 text-orange-700 border-orange-300' }
+    : null;
 
   const doStatus = async (ns: ItemStatus) => {
     setStatus(p._statusKey, ns);
@@ -59,6 +66,13 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
   return (
     <div className={`bg-card rounded-2xl border-2 border-gray-300 ${borderColor[status]} border-l-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden`}>
       <div className="p-3.5">
+        {dirBadge && (
+          <div className="mb-1.5">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-black tracking-wide ${dirBadge.cls}`}>
+              {dirBadge.label}
+            </span>
+          </div>
+        )}
         <div className="flex items-center gap-2.5 mb-2">
           <span className="relative w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs font-black shrink-0">
             {index + 1}

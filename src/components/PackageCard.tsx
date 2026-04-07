@@ -38,9 +38,9 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit }: Props) 
   const dirKind: 'ua-eu' | 'eu-ua' | null = isUaEu(p.direction) ? 'ua-eu' : isEuUa(p.direction) ? 'eu-ua' : null;
   const dirBar = dirKind === 'ua-eu' ? 'border-l-emerald-500' : dirKind === 'eu-ua' ? 'border-l-orange-500' : 'border-l-gray-300';
   const dirBadge = dirKind === 'ua-eu'
-    ? { label: '🇺🇦→🇪🇺 Видача', cls: 'bg-emerald-50 text-emerald-700' }
+    ? { label: 'UA → EU', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' }
     : dirKind === 'eu-ua'
-    ? { label: '🇪🇺→🇺🇦 Забір', cls: 'bg-orange-50 text-orange-700' }
+    ? { label: 'EU → UA', cls: 'bg-orange-100 text-orange-700 border-orange-300' }
     : null;
 
   const doStatus = async (ns: ItemStatus) => {
@@ -70,7 +70,7 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit }: Props) 
       <div className="px-3 py-2.5">
         {dirBadge && (
           <div className="mb-1.5">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black ${dirBadge.cls}`}>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-black tracking-wide ${dirBadge.cls}`}>
               {dirBadge.label}
             </span>
           </div>
