@@ -26,12 +26,18 @@ export function ListScreen() {
   } = useApp();
 
   const [splashTheme, setSplashTheme] = useState<Theme | null>(null);
-  const THEME_CYCLE: Theme[] = ['top-driver', 'lone-wolf', 'detonator', 'lightning'];
-  const cycleTheme = () => {
-    const idx = THEME_CYCLE.indexOf(theme);
-    const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
-    setSplashTheme(next);
-    setTheme(next);
+  const [themeMenuOpen, setThemeMenuOpen] = useState(false);
+  const THEME_LIST: { key: Theme; label: string; emoji: string }[] = [
+    { key: 'top-driver', label: 'ТОП Водій', emoji: '👑' },
+    { key: 'lone-wolf', label: 'Вовк-одинак', emoji: '🐺' },
+    { key: 'detonator', label: 'Підривник', emoji: '💣' },
+    { key: 'lightning', label: 'Блискавка', emoji: '⚡' },
+  ];
+  const pickTheme = (t: Theme) => {
+    setThemeMenuOpen(false);
+    if (t === theme) return;
+    setSplashTheme(t);
+    setTheme(t);
   };
 
   const [passengers, setPassengers] = useState<Passenger[]>([]);
@@ -219,7 +225,7 @@ export function ListScreen() {
             </button>
             <div className="flex items-center gap-2">
               <button
-                onClick={cycleTheme}
+                onClick={() => setThemeMenuOpen(true)}
                 className="relative w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer active:scale-90 transition-transform"
                 title="Змінити тему"
               >
@@ -407,6 +413,47 @@ export function ListScreen() {
       {showAddModal && <AddItemModal onClose={() => setShowAddModal(false)} onAdded={refresh} />}
       {editItem && <EditItemModal item={editItem} onClose={() => setEditItem(null)} onSaved={refresh} />}
       {splashTheme && <ThemeSplash theme={splashTheme} onDone={() => setSplashTheme(null)} />}
+      {themeMenuOpen && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/50 flex items-end sm:items-center justify-center"
+          onClick={() => setThemeMenuOpen(false)}
+        >
+          <div
+            className="bg-card w-full sm:max-w-sm rounded-t-2xl sm:rounded-2xl p-4 shadow-2xl"
+            style={{ animation: 'slideUp 0.25s ease-out' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-bold text-text">Оформлення</span>
+              <button onClick={() => setThemeMenuOpen(false)} className="p-1 rounded-lg hover:bg-gray-100 cursor-pointer">
+                <X className="w-4 h-4 text-muted" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {THEME_LIST.map((t) => {
+                const active = t.key === theme;
+                return (
+                  <button
+                    key={t.key}
+                    onClick={() => pickTheme(t.key)}
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border-2 cursor-pointer active:scale-[0.98] transition-all ${
+                      active ? 'border-brand bg-brand/10' : 'border-border bg-bg hover:border-brand/40'
+                    }`}
+                  >
+                    <div className="w-9 h-9 flex items-center justify-center rounded-lg bg-card shrink-0">
+                      <ThemeBadge theme={t.key} unified={false} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="text-sm font-bold text-text">{t.emoji} {t.label}</div>
+                    </div>
+                    {active && <div className="w-2 h-2 rounded-full bg-brand" />}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
