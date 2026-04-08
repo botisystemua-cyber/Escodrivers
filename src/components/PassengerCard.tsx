@@ -62,10 +62,6 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
     try { await updateItemStatus(driverName, routeName, p, 'pending', 'Відміна'); showToast('Відмінено'); }
     catch (e) { showToast('Помилка: ' + (e as Error).message); setStatus(p._statusKey, prev); }
   };
-  const nav = (addr: string) => {
-    if (addr) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`, '_blank');
-    else showToast('Немає адреси');
-  };
 
   return (
     <div className={`bg-card rounded-2xl border-2 border-gray-300 ${borderColor[status]} border-l-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden`}>

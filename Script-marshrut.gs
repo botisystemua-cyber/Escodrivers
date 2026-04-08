@@ -1,19 +1,53 @@
 // ============================================
-// BOTILOGISTICS DRIVERS CRM v2.0
-// Єдиний Apps Script для таблиці Marhrut_Test
-// ID: 1Ku__ll0kDvp5dCeaS6QdnHrGGeoic-rykib6N1L7jeQ
+// BOTILOGISTICS DRIVERS CRM v2.1
+// Єдиний Apps Script для драйверської апки
 // ============================================
 //
-// СТРУКТУРА:
-//   Маршрут_1/2/3  — пасажири + посилки (поле "Тип запису")
-//   Відправка_1/2/3 — відправлення (read-only для водія)
-//   Витрати_1/2/3  — витрати водія
-//   *_Шаблон       — шаблони, ігноруються
-//   Зведення рейсів — зведення, ігнорується
+// ПІДКЛЮЧЕНІ ТАБЛИЦІ:
+//   MARHRUT    — маршрути водіїв (Маршрут_*, Відправка_*, Витрати_*)
+//   POSYLKI    — база посилок (Реєстрація ТТН УК-єв, Виклик Курєра ЄВ-ук)
+//   PASSENGERS — база пасажирів (Україна-ЄВ, Європа-УК, Автопарк, Календар)
+//   KLIYENTU   — клієнти + Відгуки + Чат + Бронювання + Замовлення
+//   FINANCE    — платежі, зведення рейсів, розподіл, аналітика
+//   ARCHIVE    — архів пасажирів/посилок/маршрутів + центральні Логи
+//   CONFIG     — користувачі, персонал, доступи, налаштування
+//
+// СТРУКТУРА MARHRUT:
+//   Маршрут_*    — пасажири + посилки (поле "Тип запису")
+//   Відправка_*  — відправлення (read-only для водія крім додавання)
+//   Витрати_*    — витрати водія
+//   *_Шаблон     — шаблони, ігноруються
+//   Зведення рейсів — ігнорується
 // ============================================
 
-var SPREADSHEET_ID = '1Ku__ll0kDvp5dCeaS6QdnHrGGeoic-rykib6N1L7jeQ';
+// --- ID усіх таблиць ---
+var SS = {
+  MARHRUT:    '10SZhKV08BJyvWoMwhT0iddtWzYrDYFjCM8xgqViuE3Y',
+  POSYLKI:    '1_vfEhdLEM2SVTBiu_3eDilMs1HlKxvPrJBbiHYjgrJo',
+  PASSENGERS: '1lgaCHqWBIa6oFjFWfD8m58sLwbvQjmeje2gx3YAnBCo',
+  KLIYENTU:   '1KW2Vh_E7OxggNB_NOzWmVM8siHzHr_mG8C939YXDC38',
+  FINANCE:    '1AhID7Ust45sA4PCAUjWJz515qnxzQGSj5wGQ7K8Jbu0',
+  ARCHIVE:    '19Ftljah5eX07RLHJaBrvYV7hStxspxcJVi6VATGZvF0',
+  CONFIG:     '1hZ67tuQYukugO_TjNsOS3IjovBR5hWMg-JmGAq5udBE'
+};
+
+// Зворотна сумісність (використовується в існуючих функціях)
+var SPREADSHEET_ID = SS.MARHRUT;
+
+// Локальний лог-аркуш в MARHRUT (історія дій водія по рейсу — залишаємо для UI)
 var SHEET_LOGS = 'Логи водіїв';
+// Центральний аудит-лог в ARCHIVE (всі дії всіх користувачів)
+var ARCHIVE_LOG_SHEET = 'Логи';
+
+// Кеш відкритих таблиць у межах одного виклику
+var _ssCache = {};
+function openSS_(key) {
+  if (_ssCache[key]) return _ssCache[key];
+  var id = SS[key];
+  if (!id) throw new Error('Unknown spreadsheet key: ' + key);
+  _ssCache[key] = SpreadsheetApp.openById(id);
+  return _ssCache[key];
+}
 
 var STATUS_COLORS = {
   'pending':     { bg: '#fffbf0', border: '#ffc107', font: '#ffc107' },
@@ -219,6 +253,10 @@ function doPost(e) {
         return respond(handleDeleteExpense(data));
       case 'updateAdvance':
         return respond(handleUpdateAdvance(data));
+      case 'recordPayment':
+        return respond(handleRecordPayment(data));
+      case 'rateClient':
+        return respond(handleRateClient(data));
       default:
         return respond({ success: false, error: 'Невідома дія: ' + action });
     }
@@ -484,6 +522,13 @@ function handleDriverStatusUpdate(data) {
       data.cancelReason || '',
       data.phone || ''
     ]);
+    writeAuditLog_({
+      who: data.driverId || data.driverName || '', role: 'driver',
+      action: 'updateStatus', table: 'MARHRUT', sheet: routeName,
+      recordId: data.itemId || '', field: 'Статус',
+      newValue: data.status || '',
+      note: data.cancelReason || ''
+    });
 
     var targetSheet = ss.getSheetByName(routeName);
     if (!targetSheet) return { success: true, message: 'Логовано (аркуш не знайдено)' };
@@ -603,6 +648,11 @@ function handleAddRouteItem(data) {
           'відправка', 'added', '', ''
         ]);
       }
+      writeAuditLog_({
+        who: data.driverName || '', role: 'driver', action: 'addShipping',
+        table: 'MARHRUT', sheet: shipSheetName, recordId: dispatchId,
+        newValue: (data.internalNum || '') + ' ' + (data.recipientName || '')
+      });
 
       return { success: true, message: 'Додано відправку', itemId: dispatchId };
     }
@@ -655,6 +705,12 @@ function handleAddRouteItem(data) {
         data.itemType || '', 'added', '', ''
       ]);
     }
+    writeAuditLog_({
+      who: data.driverName || '', role: 'driver', action: 'addItem',
+      table: 'MARHRUT', sheet: routeName, recordId: itemId,
+      newValue: itemType + ' ' + (data.name || data.senderName || data.recipientName || ''),
+      note: data.direction || ''
+    });
 
     return { success: true, message: 'Додано ' + (itemType === 'пасажир' ? 'пасажира' : 'посилку'), itemId: itemId };
   } catch (err) {
@@ -724,6 +780,12 @@ function handleUpdateDriverFields(data) {
         data.itemType || '', 'edited', 'fields: ' + updated, ''
       ]);
     }
+    writeAuditLog_({
+      who: data.driverId || data.driverName || '', role: 'driver',
+      action: 'editFields', table: 'MARHRUT', sheet: routeName,
+      recordId: itemId, field: Object.keys(fields).join(', '),
+      note: 'updated ' + updated + ' fields'
+    });
 
     return { success: true, message: 'Оновлено ' + updated + ' полів', updated: updated };
   } catch (err) {
@@ -855,6 +917,12 @@ function handleAddExpense(data) {
         'витрати', 'added', category + ': ' + amount + ' ' + (data.currency || 'CHF'), ''
       ]);
     }
+    writeAuditLog_({
+      who: data.driverName || '', role: 'driver', action: 'addExpense',
+      table: 'MARHRUT', sheet: expSheetName, recordId: expId,
+      field: category, newValue: amount + ' ' + (data.currency || 'CHF'),
+      note: data.description || ''
+    });
 
     return { success: true, message: 'Витрату додано', expId: expId };
   } catch (err) {
@@ -900,6 +968,10 @@ function handleDeleteExpense(data) {
         'витрати', 'deleted', 'row ' + rowNum, ''
       ]);
     }
+    writeAuditLog_({
+      who: data.driverName || '', role: 'driver', action: 'deleteExpense',
+      table: 'MARHRUT', sheet: expSheetName, recordId: 'row ' + rowNum
+    });
 
     return { success: true, message: 'Витрату видалено' };
   } catch (err) {
@@ -948,10 +1020,201 @@ function handleUpdateAdvance(data) {
         'cash: ' + cash + ' ' + cashCurrency + ', card: ' + card + ' ' + cardCurrency, ''
       ]);
     }
+    writeAuditLog_({
+      who: data.driverName || '', role: 'driver', action: 'updateAdvance',
+      table: 'MARHRUT', sheet: expSheetName,
+      newValue: 'cash: ' + cash + ' ' + cashCurrency + ', card: ' + card + ' ' + cardCurrency
+    });
 
     return { success: true, message: 'Кошти оновлено' };
   } catch (err) {
     return { success: false, error: err.toString() };
+  }
+}
+
+// ============================================
+// ЦЕНТРАЛЬНИЙ АУДИТ-ЛОГ (ARCHIVE.Логи)
+// Колонки: A LOG_ID, B Дата і час, C Хто, D Роль, E Дія,
+//          F Таблиця, G Аркуш, H ID запису, I Поле,
+//          J Значення БУЛО, K Значення СТАЛО, L IP, M Пристрій,
+//          N Підтверджено власником, O Дата підтв., P Підозріло, Q Примітка
+// ============================================
+function writeAuditLog_(entry) {
+  try {
+    var ss = openSS_('ARCHIVE');
+    var sheet = ss.getSheetByName(ARCHIVE_LOG_SHEET);
+    if (!sheet) return; // не створюємо автоматично, щоб не зіпсувати структуру архіву
+    var now = new Date();
+    var logId = 'LOG_' + Utilities.formatDate(now, 'Europe/Kiev', 'yyyyMMdd_HHmmss') + '_' + Math.floor(Math.random() * 1000);
+    sheet.appendRow([
+      logId,
+      Utilities.formatDate(now, 'Europe/Kiev', 'yyyy-MM-dd HH:mm:ss'),
+      entry.who || '',
+      entry.role || 'driver',
+      entry.action || '',
+      entry.table || '',
+      entry.sheet || '',
+      entry.recordId || '',
+      entry.field || '',
+      entry.oldValue || '',
+      entry.newValue || '',
+      entry.ip || '',
+      entry.device || '',
+      '', '', '',
+      entry.note || ''
+    ]);
+  } catch (e) {
+    // Не ламаємо основну дію через помилку логування
+  }
+}
+
+// ============================================
+// FINANCE.Платежі — водій записує отриману оплату
+// Колонки (21): A PAY_ID, B Дата створення, C Хто вніс, D Роль,
+//   E CLI_ID, F PAX_ID, G PKG_ID, H RTE_ID, I CAL_ID, J Ід_смарт,
+//   K Тип платежу, L Сума, M Валюта, N Форма оплати, O Статус платежу,
+//   P Борг сума, Q Борг валюта, R Дата погашення, S Примітка, T DATE_ARCHIVE, U ARCHIVED_BY
+// ============================================
+function handleRecordPayment(data) {
+  try {
+    var amount = parseFloat(data.amount);
+    if (!amount || amount <= 0) return { success: false, error: 'Невалідна сума' };
+    if (!data.driverName) return { success: false, error: 'Не вказано водія' };
+
+    var ss = openSS_('FINANCE');
+    var sheet = ss.getSheetByName('Платежі');
+    if (!sheet) return { success: false, error: 'Аркуш Платежі не знайдено у FINANCE' };
+
+    var now = new Date();
+    var dateStr = Utilities.formatDate(now, 'Europe/Kiev', 'yyyy-MM-dd HH:mm:ss');
+    var payId = 'PAY_' + Utilities.formatDate(now, 'Europe/Kiev', 'yyyyMMdd_HHmmss') + '_' + Math.floor(Math.random() * 1000);
+
+    var row = new Array(21).fill('');
+    row[0]  = payId;
+    row[1]  = dateStr;
+    row[2]  = data.driverName;
+    row[3]  = 'driver';
+    row[4]  = data.cliId || '';
+    row[5]  = data.paxId || '';
+    row[6]  = data.pkgId || '';
+    row[7]  = data.rteId || '';
+    row[8]  = data.calId || '';
+    row[9]  = data.smartId || '';
+    row[10] = data.paymentType || 'готівка водій';
+    row[11] = amount;
+    row[12] = data.currency || 'CHF';
+    row[13] = data.payForm || 'Готівка';
+    row[14] = data.payStatus || 'Оплачено';
+    row[15] = data.debtAmount || '';
+    row[16] = data.debtCurrency || '';
+    row[17] = data.settleDate || '';
+    row[18] = data.note || '';
+    sheet.appendRow(row);
+
+    writeAuditLog_({
+      who: data.driverName, role: 'driver', action: 'recordPayment',
+      table: 'FINANCE', sheet: 'Платежі', recordId: payId,
+      field: 'amount', newValue: amount + ' ' + (data.currency || 'CHF'),
+      note: (data.rteId ? 'RTE:' + data.rteId + ' ' : '') + (data.paxId || data.pkgId || '')
+    });
+
+    return { success: true, message: 'Оплату записано', payId: payId };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// ============================================
+// KLIYENTU.Відгуки клієнтів — водій ставить оцінку клієнту
+// Колонки (26): A REVIEW_ID, B Дата відгуку, C Статус відгуку,
+//   D RTE_ID, E PAX_ID, F PKG_ID, G Дата рейсу, H Напрям,
+//   I Номер авто, J Водій, K CLIENT_ID, L Ід_смарт/CRM,
+//   M Телефон клієнта, N Піб клієнта, O Тип запису,
+//   P Оцінка водія, Q Бал водія, R Коментар про водія,
+//   S Оцінка менеджера, T Бал менеджера, U Коментар про менеджера,
+//   V Загальний відгук, W Опрацьовано, X Хто опрацював, Y Дата опрацювання, Z Результат
+// ============================================
+function handleRateClient(data) {
+  try {
+    var rating = parseFloat(data.rating);
+    if (!rating || rating < 1 || rating > 5) return { success: false, error: 'Оцінка 1-5' };
+    if (!data.driverName) return { success: false, error: 'Не вказано водія' };
+    if (!data.cliId && !data.clientPhone) return { success: false, error: 'Потрібен CLI_ID або телефон' };
+
+    var ss = openSS_('KLIYENTU');
+    var sheet = ss.getSheetByName('Відгуки клієнтів');
+    if (!sheet) return { success: false, error: 'Аркуш "Відгуки клієнтів" не знайдено у KLIYENTU' };
+
+    var now = new Date();
+    var dateStr = Utilities.formatDate(now, 'Europe/Kiev', 'yyyy-MM-dd HH:mm:ss');
+    var reviewId = 'REV_' + Utilities.formatDate(now, 'Europe/Kiev', 'yyyyMMdd_HHmmss') + '_' + Math.floor(Math.random() * 1000);
+
+    var row = new Array(26).fill('');
+    row[0]  = reviewId;
+    row[1]  = dateStr;
+    row[2]  = 'Новий';
+    row[3]  = data.rteId || '';
+    row[4]  = data.paxId || '';
+    row[5]  = data.pkgId || '';
+    row[6]  = data.dateTrip || '';
+    row[7]  = data.direction || '';
+    row[8]  = data.autoNum || '';
+    row[9]  = data.driverName;
+    row[10] = data.cliId || '';
+    row[11] = data.smartId || '';
+    row[12] = data.clientPhone || '';
+    row[13] = data.clientName || '';
+    row[14] = data.itemType || ''; // "Пасажир" / "Посилка"
+    row[15] = rating;               // Оцінка водія (1-5)
+    row[16] = rating;               // Бал водія
+    row[17] = data.comment || '';   // Коментар про водія
+    row[21] = data.comment || '';   // Загальний відгук
+    sheet.appendRow(row);
+
+    // Оновлюємо агрегати в аркуші Клієнти (якщо є CLI_ID)
+    try {
+      if (data.cliId) updateClientRating_(ss, data.cliId, rating, data.comment || '');
+    } catch (e) { /* не критично */ }
+
+    writeAuditLog_({
+      who: data.driverName, role: 'driver', action: 'rateClient',
+      table: 'KLIYENTU', sheet: 'Відгуки клієнтів', recordId: reviewId,
+      field: 'rating', newValue: String(rating),
+      note: (data.cliId || data.clientPhone || '') + ' ' + (data.comment || '')
+    });
+
+    return { success: true, message: 'Оцінку збережено', reviewId: reviewId };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// Оновлює агрегати рейтингу в аркуші Клієнти
+function updateClientRating_(ss, cliId, rating, comment) {
+  var sheet = ss.getSheetByName('Клієнти');
+  if (!sheet) return;
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return;
+  var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+  for (var i = 0; i < ids.length; i++) {
+    if (String(ids[i][0]) === String(cliId)) {
+      var rowNum = i + 2;
+      // W Рейт. водія (23), X Оцінок від водія (24), Y Сума балів водія (25)
+      var drCount = parseFloat(sheet.getRange(rowNum, 24).getValue()) || 0;
+      var drSum   = parseFloat(sheet.getRange(rowNum, 25).getValue()) || 0;
+      drCount += 1;
+      drSum   += rating;
+      var drAvg = drSum / drCount;
+      sheet.getRange(rowNum, 23).setValue(Math.round(drAvg * 100) / 100);
+      sheet.getRange(rowNum, 24).setValue(drCount);
+      sheet.getRange(rowNum, 25).setValue(drSum);
+      if (comment) {
+        // AK (37) Останній відгук, AL (38) Дата останнього відгуку
+        sheet.getRange(rowNum, 37).setValue(comment);
+        sheet.getRange(rowNum, 38).setValue(new Date());
+      }
+      return;
+    }
   }
 }
 
