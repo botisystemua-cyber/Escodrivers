@@ -7,8 +7,9 @@ import type { Package, ItemStatus } from '../types';
 import { useApp } from '../store/useAppStore';
 import { updateItemStatus } from '../api';
 import { Highlight } from './Highlight';
+import { isUaEu, isEuUa } from '../utils/smsParser';
 
-interface Props { pkg: Package; index: number; searchQuery?: string; onEdit?: (p: Package) => void; }
+interface Props { pkg: Package; index: number; searchQuery?: string; onEdit?: (p: Package) => void; onConvertPickup?: (p: Package) => void; }
 
 const borderColor: Record<ItemStatus, string> = {
   pending: 'border-l-amber-400', 'in-progress': 'border-l-blue-500',
@@ -21,7 +22,7 @@ const stLabel: Record<ItemStatus, { t: string; c: string }> = {
   cancelled: { t: 'Скасов.', c: 'text-red-700 bg-red-50' },
 };
 
-export function PackageCard({ pkg: p, index, searchQuery = '', onEdit }: Props) {
+export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvertPickup }: Props) {
   const hl = (text: string) => <Highlight text={text} query={searchQuery} />;
   const { getStatus, setStatus, hiddenCols, driverName, currentSheet, isUnifiedView, showToast } = useApp();
   const [showCancel, setShowCancel] = useState(false);
@@ -34,6 +35,13 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit }: Props) 
   const canUndo = status === 'completed' || status === 'cancelled';
   const routeName = isUnifiedView && p._sourceRoute ? p._sourceRoute : currentSheet;
   const sl = stLabel[status];
+  const dirKind: 'ua-eu' | 'eu-ua' | null = isUaEu(p.direction) ? 'ua-eu' : isEuUa(p.direction) ? 'eu-ua' : null;
+  const dirBar = dirKind === 'ua-eu' ? 'border-l-emerald-500' : dirKind === 'eu-ua' ? 'border-l-orange-500' : 'border-l-gray-300';
+  const dirBadge = dirKind === 'ua-eu'
+    ? { label: 'UA → EU', cls: 'bg-emerald-100 text-emerald-700 border-emerald-300' }
+    : dirKind === 'eu-ua'
+    ? { label: 'EU → UA', cls: 'bg-orange-100 text-orange-700 border-orange-300' }
+    : null;
 
   const doStatus = async (ns: ItemStatus) => {
     setStatus(p._statusKey, ns);
@@ -57,8 +65,16 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit }: Props) 
   };
 
   return (
-    <div className={`bg-card rounded-2xl border-2 border-gray-300 ${borderColor[status]} border-l-4 shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden`}>
+    <div className={`bg-card rounded-2xl border-2 border-gray-300 ${dirBar} border-l-[6px] shadow-[0_2px_8px_rgba(0,0,0,0.06)] overflow-hidden`}>
+      <div className={`h-0.5 ${borderColor[status].replace('border-l-', 'bg-')}`} />
       <div className="px-3 py-2.5">
+        {dirBadge && (
+          <div className="mb-1.5">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-black tracking-wide ${dirBadge.cls}`}>
+              {dirBadge.label}
+            </span>
+          </div>
+        )}
         <div className="flex items-center gap-2 mb-1">
           <span className="relative w-7 h-7 rounded-lg bg-gray-100 text-secondary flex items-center justify-center text-[11px] font-black shrink-0">
             {index + 1}
@@ -81,10 +97,20 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit }: Props) 
 
         <div className="flex gap-2 mb-2">
           <Btn icon={Phone} label="Дзвонити" color="bg-green-50 text-green-700" onClick={() => { if (p.recipientPhone) window.location.href = `tel:${p.recipientPhone}`; else showToast('Немає телефону'); }} />
-          <Btn icon={MapPin} label="Звідки" color="bg-blue-50 text-blue-700" onClick={() => { if (p.addrFrom) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(p.addrFrom)}&travelmode=driving`, '_blank'); else showToast('Немає адреси відправки'); }} />
+          <Btn icon={MapPin} label="Куди" color="bg-blue-50 text-blue-700" onClick={() => {
+            const addr = dirKind === 'eu-ua' ? p.addrFrom : p.recipientAddr;
+            if (addr) window.open(`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}&travelmode=driving`, '_blank');
+            else showToast('Немає адреси');
+          }} />
           <Btn icon={MapPin} label="Куди" color="bg-blue-50 text-blue-700" onClick={navigate} />
           <Btn icon={expanded ? ChevronUp : Info} label={expanded ? 'Згорнути' : 'Деталі'} color={expanded ? 'bg-brand/10 text-brand' : 'bg-gray-50 text-gray-600'} onClick={() => setExpanded(!expanded)} />
         </div>
+
+        {dirKind === 'eu-ua' && status !== 'completed' && onConvertPickup && (
+          <button onClick={() => onConvertPickup(p)} className="w-full mb-2 py-2.5 rounded-xl bg-emerald-500 text-white text-[12px] font-bold cursor-pointer active:scale-95 transition-transform">
+            ✅ Оформити відправку
+          </button>
+        )}
 
         <div className="flex gap-1.5">
           <SB icon={RotateCw} c="border-blue-200 text-blue-600 hover:bg-blue-50" onClick={() => doStatus('in-progress')} />
