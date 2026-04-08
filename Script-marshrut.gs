@@ -1,6 +1,8 @@
 // ============================================
-// BOTILOGISTICS DRIVERS CRM v2.1
+// BOTILOGISTICS DRIVERS CRM v2.2
 // Єдиний Apps Script для драйверської апки
+// v2.2: _meta sync, колонка "Фото посилки" (AY), handleUpdateDriverFieldsSafe
+//       з whitelist + CAS, блок completed→cancelled, обовʼязкова cancelReason
 // ============================================
 //
 // ПІДКЛЮЧЕНІ ТАБЛИЦІ:
@@ -38,6 +40,34 @@ var SPREADSHEET_ID = SS.MARHRUT;
 var SHEET_LOGS = 'Логи водіїв';
 // Центральний аудит-лог в ARCHIVE (всі дії всіх користувачів)
 var ARCHIVE_LOG_SHEET = 'Логи';
+
+// --- Кросскриптова синхронізація ---
+// Службовий аркуш у MARHRUT для "поштової скриньки" між скриптами (водій / pax CRM / pkg CRM).
+// Колонки: A sheet_name | B last_modified (Date.now() мс) | C last_actor
+var META_SHEET = '_meta';
+// Ідентифікатор цього скрипта. НЕ МІНЯТИ — на нього зав'язана whitelist-логіка.
+var ACTOR = 'driver';
+
+// Допустимі значення форми оплати (case-insensitive порівняння)
+var PAY_FORM_VALUES = ['готівка', 'безготівка', 'наложка', 'борг частково'];
+
+// Whitelist: які колонки водій може редагувати через safe-handler.
+// Назви мають ТОЧНО збігатися із заголовками рядка 1 у відповідних аркушах.
+var DRIVER_WHITELIST_ROUTE = [
+  'Статус',
+  'Форма оплати',
+  'Статус оплати',
+  'Коментар водія',
+  'Примітка',
+  'Фото посилки'
+];
+var DRIVER_WHITELIST_SHIP = [
+  'Статус',
+  'Форма оплати',
+  'Статус оплати',
+  'Фото',
+  'Примітка'
+];
 
 // Кеш відкритих таблиць у межах одного виклику
 var _ssCache = {};
@@ -110,9 +140,10 @@ var COL = {
   DATE_ARCHIVE: 46,     // AU
   ARCHIVED_BY: 47,      // AV
   ARCHIVE_REASON: 48,   // AW
-  ARCHIVE_ID: 49        // AX
+  ARCHIVE_ID: 49,       // AX
+  PHOTO: 50             // AY — Фото посилки (додано 2026-04, заголовок "Фото посилки")
 };
-var TOTAL_COLS = 50;
+var TOTAL_COLS = 51;
 
 // ============================================
 // КОЛОНКИ — Відправка (28 колонок)
@@ -210,6 +241,8 @@ function doGet(e) {
       case 'getExpenses':
         if (!sheet) return respond({ success: false, error: 'Не вказано sheet' });
         return respond(getExpenses(sheet));
+      case 'getRouteVersions':
+        return respond(apiGetRouteVersions());
       default:
         return respond({ success: false, error: 'Невідома GET дія: ' + action });
     }
@@ -245,6 +278,10 @@ function doPost(e) {
         return respond(handleAddRouteItem(data));
       case 'updateDriverFields':
         return respond(handleUpdateDriverFields(data));
+      case 'updateDriverFieldsSafe':
+        return respond(handleUpdateDriverFieldsSafe(data));
+      case 'getRouteVersions':
+        return respond(apiGetRouteVersions());
       case 'getExpenses':
         return respond(getExpenses(payload.sheetName || ''));
       case 'addExpense':
@@ -370,6 +407,7 @@ function readRouteByType_(sheetName, typeFilter) {
       tag: str(row[COL.TAG]),
       note: str(row[COL.NOTE]),
       smsNote: str(row[COL.SMS_NOTE]),
+      photo: str(row[COL.PHOTO]),
       sheet: sheetName
     };
 
@@ -495,8 +533,40 @@ function handleDriverStatusUpdate(data) {
       return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
     }
 
+    // Скасування — обов'язкова причина (захист від безпідставних відмов)
+    if (data.status === 'cancelled' && !str(data.cancelReason)) {
+      return { success: false, error: "Обов'язкова причина скасування" };
+    }
+
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var now = new Date();
+
+    // Перевірка completed → cancelled ДО запису (потрібно читати поточний статус з таблиці)
+    // Виконуємо одразу щоб не логувати спробу перед відмовою
+    if (data.status === 'cancelled') {
+      var checkSheet = ss.getSheetByName(routeName);
+      if (checkSheet) {
+        var checkLastRow = checkSheet.getLastRow();
+        if (checkLastRow >= 2) {
+          var checkIdCol = isShipping ? COL_SHIP.DISPATCH_ID : COL.ITEM_ID;
+          var checkStatusCol = isShipping ? COL_SHIP.STATUS : COL.STATUS;
+          var checkTargetId = str(data.itemId);
+          var checkIds = checkSheet.getRange(2, checkIdCol + 1, checkLastRow - 1, 1).getValues();
+          for (var ci = 0; ci < checkIds.length; ci++) {
+            if (str(checkIds[ci][0]) === checkTargetId) {
+              var curStatus = str(checkSheet.getRange(ci + 2, checkStatusCol + 1).getValue()).toLowerCase();
+              if (curStatus === 'completed') {
+                return {
+                  success: false,
+                  error: 'Не можна скасувати доставлену посилку. Використайте процедуру Повернення.'
+                };
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
 
     // Логуємо
     var logSheet = ss.getSheetByName(SHEET_LOGS);
@@ -573,6 +643,8 @@ function handleDriverStatusUpdate(data) {
     }
 
     if (rowsUpdated === 0) return { success: true, message: 'Логовано (запис не знайдено)' };
+
+    _touchMeta_(routeName);
     return { success: true, message: 'Статус записано', updatedRows: rowsUpdated };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -624,6 +696,7 @@ function handleAddRouteItem(data) {
       shipRow[COL_SHIP.INTERNAL_NUM] = data.internalNum || '';
       shipRow[COL_SHIP.WEIGHT] = data.pkgWeight || '';
       shipRow[COL_SHIP.DESCRIPTION] = data.pkgDesc || '';
+      shipRow[COL_SHIP.PHOTO] = data.photo || '';
       shipRow[COL_SHIP.AMOUNT] = data.amount || '';
       shipRow[COL_SHIP.CURRENCY] = data.currency || 'CHF';
       shipRow[COL_SHIP.DEPOSIT] = data.deposit || '';
@@ -654,6 +727,7 @@ function handleAddRouteItem(data) {
         newValue: (data.internalNum || '') + ' ' + (data.recipientName || '')
       });
 
+      _touchMeta_(shipSheetName);
       return { success: true, message: 'Додано відправку', itemId: dispatchId };
     }
 
@@ -677,6 +751,7 @@ function handleAddRouteItem(data) {
     row[COL.PAY_FORM] = data.payForm || '';
     row[COL.STATUS] = 'pending';
     row[COL.NOTE] = data.note || '';
+    row[COL.PHOTO] = data.photo || '';
 
     if (itemType === 'пасажир') {
       row[COL.PAX_NAME] = data.name || '';
@@ -712,6 +787,7 @@ function handleAddRouteItem(data) {
       note: data.direction || ''
     });
 
+    _touchMeta_(routeName);
     return { success: true, message: 'Додано ' + (itemType === 'пасажир' ? 'пасажира' : 'посилку'), itemId: itemId };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -787,6 +863,7 @@ function handleUpdateDriverFields(data) {
       note: 'updated ' + updated + ' fields'
     });
 
+    _touchMeta_(routeName);
     return { success: true, message: 'Оновлено ' + updated + ' полів', updated: updated };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -924,6 +1001,7 @@ function handleAddExpense(data) {
       note: data.description || ''
     });
 
+    _touchMeta_(expSheetName);
     return { success: true, message: 'Витрату додано', expId: expId };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -973,6 +1051,7 @@ function handleDeleteExpense(data) {
       table: 'MARHRUT', sheet: expSheetName, recordId: 'row ' + rowNum
     });
 
+    _touchMeta_(expSheetName);
     return { success: true, message: 'Витрату видалено' };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -1026,6 +1105,7 @@ function handleUpdateAdvance(data) {
       newValue: 'cash: ' + cash + ' ' + cashCurrency + ', card: ' + card + ' ' + cardCurrency
     });
 
+    _touchMeta_(expSheetName);
     return { success: true, message: 'Кошти оновлено' };
   } catch (err) {
     return { success: false, error: err.toString() };
@@ -1219,6 +1299,310 @@ function updateClientRating_(ss, cliId, rating, comment) {
 }
 
 // ============================================
+// _META — КРОССКРИПТОВА СИНХРОНІЗАЦІЯ
+// ============================================
+// Поштова скринька між водійським скриптом і pax/pkg CRM.
+// Час зберігається як Date.now() (мс), не лічильник — щоб не було lost-increment.
+// _meta.last_modified оновлюється у КІНЦІ кожної write-операції по MARHRUT.
+// Аркуш створює ВЛАСНИК вручну (заголовки рядка 1: sheet_name|last_modified|last_actor).
+// Якщо аркуша нема — мовчки нічого не робимо (не автостворюємо, бо pax/pkg CRM теж
+// можуть створити з іншою структурою).
+function _getMetaSheet_() {
+  try {
+    return SpreadsheetApp.openById(SS.MARHRUT).getSheetByName(META_SHEET);
+  } catch (e) {
+    return null;
+  }
+}
+
+function _touchMeta_(sheetName) {
+  if (!sheetName) return;
+  var lock = LockService.getScriptLock();
+  var locked = false;
+  try {
+    locked = lock.tryLock(5000);
+    var sheet = _getMetaSheet_();
+    if (!sheet) return;
+    var now = Date.now();
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) {
+      sheet.appendRow([sheetName, now, ACTOR]);
+      return;
+    }
+    var names = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < names.length; i++) {
+      if (String(names[i][0]) === sheetName) {
+        sheet.getRange(i + 2, 2).setValue(now);
+        sheet.getRange(i + 2, 3).setValue(ACTOR);
+        return;
+      }
+    }
+    sheet.appendRow([sheetName, now, ACTOR]);
+  } catch (e) {
+    // silent — не блокуємо основну дію
+  } finally {
+    if (locked) {
+      try { lock.releaseLock(); } catch (e) {}
+    }
+  }
+}
+
+// Читає _meta і повертає { sheetName: {lastModified, lastActor} }.
+// Фронт дергає кожні 30с — якщо lastModified > локального snapshot → перечитує маршрут.
+function apiGetRouteVersions() {
+  try {
+    var sheet = _getMetaSheet_();
+    if (!sheet) return { success: true, versions: {} };
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: true, versions: {} };
+    var data = sheet.getRange(2, 1, lastRow - 1, 3).getValues();
+    var versions = {};
+    for (var i = 0; i < data.length; i++) {
+      var name = String(data[i][0] || '').trim();
+      if (!name) continue;
+      versions[name] = {
+        lastModified: Number(data[i][1]) || 0,
+        lastActor: String(data[i][2] || '')
+      };
+    }
+    return { success: true, versions: versions };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// ============================================
+// handleUpdateDriverFieldsSafe — БЕЗПЕЧНИЙ batch-редактор
+// ============================================
+// Вхід: {
+//   routeName, itemId,
+//   fields: { '<header>': '<newVal>', ... },
+//   expected: { '<header>': '<oldVal>', ... }  // опційно, CAS
+//   cancelReason: '...',                        // обов'язково якщо Статус='cancelled'
+//   driverName: '...'
+// }
+//
+// Захист:
+//  - whitelist колонок (DRIVER_WHITELIST_ROUTE / DRIVER_WHITELIST_SHIP)
+//  - валідація "Форма оплати" (PAY_FORM_VALUES)
+//  - заборона completed → cancelled (тільки route)
+//  - обов'язкова cancelReason при статусі cancelled
+//  - CAS: якщо передано expected, порівнює з поточними значеннями; при розбіжності
+//    повертає { success:false, conflict:true, current:{...} } без запису
+//  - клітинкові setValue (НЕ setValues цілого рядка)
+//  - writeAuditLog_ + _touchMeta_ в кінці
+function handleUpdateDriverFieldsSafe(data) {
+  try {
+    var routeName = String(data.routeName || '').trim();
+    var isShipping = routeName.indexOf('Відправка_') === 0;
+    var isRoute = routeName.indexOf('Маршрут_') === 0;
+    if (!routeName || (!isRoute && !isShipping)) {
+      return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
+    }
+
+    var itemId = data.itemId;
+    if (!itemId) return { success: false, error: "itemId обов'язковий" };
+
+    var fields = data.fields;
+    if (!fields || typeof fields !== 'object') {
+      return { success: false, error: 'fields обовʼязкові' };
+    }
+
+    var whitelist = isShipping ? DRIVER_WHITELIST_SHIP : DRIVER_WHITELIST_ROUTE;
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(routeName);
+    if (!sheet) return { success: false, error: 'Аркуш не знайдено: ' + routeName };
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 2) return { success: false, error: 'Аркуш порожній' };
+
+    // Нормалізовані заголовки
+    var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(function(h) {
+      return String(h).replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim();
+    });
+
+    // Знайти рядок запису
+    var idCol = isShipping ? COL_SHIP.DISPATCH_ID : COL.ITEM_ID;
+    var ids = sheet.getRange(2, idCol + 1, lastRow - 1, 1).getValues();
+    var targetId = String(itemId);
+    var rowNum = -1;
+    for (var r = 0; r < ids.length; r++) {
+      if (String(ids[r][0]) === targetId) { rowNum = r + 2; break; }
+    }
+    if (rowNum === -1) return { success: false, error: 'Запис не знайдено: ' + itemId };
+
+    // Читаємо поточний стан потрібних клітинок один раз (для CAS + completed-guard + note-append)
+    var current = {};
+    var fieldNames = Object.keys(fields);
+    // Додаємо ключі з expected, які можуть не збігатися з fields
+    if (data.expected && typeof data.expected === 'object') {
+      var expKeys = Object.keys(data.expected);
+      for (var ek = 0; ek < expKeys.length; ek++) {
+        if (fieldNames.indexOf(expKeys[ek]) === -1) fieldNames.push(expKeys[ek]);
+      }
+    }
+    // Завжди читаємо "Статус" для completed-guard у маршрутах
+    if (isRoute && fieldNames.indexOf('Статус') === -1) fieldNames.push('Статус');
+    // Для cancel-append читаємо ще "Коментар водія" / "Примітка"
+    if (fields['Статус'] && String(fields['Статус']).toLowerCase() === 'cancelled') {
+      if (fieldNames.indexOf('Коментар водія') === -1) fieldNames.push('Коментар водія');
+      if (fieldNames.indexOf('Примітка') === -1) fieldNames.push('Примітка');
+    }
+    for (var fn = 0; fn < fieldNames.length; fn++) {
+      var colIdxCur = headers.indexOf(fieldNames[fn]);
+      if (colIdxCur === -1) continue;
+      current[fieldNames[fn]] = str(sheet.getRange(rowNum, colIdxCur + 1).getValue());
+    }
+
+    // CAS-перевірка
+    if (data.expected && typeof data.expected === 'object') {
+      var conflictKeys = [];
+      var expKeys2 = Object.keys(data.expected);
+      for (var ek2 = 0; ek2 < expKeys2.length; ek2++) {
+        var key = expKeys2[ek2];
+        if (str(current[key]) !== str(data.expected[key])) {
+          conflictKeys.push(key);
+        }
+      }
+      if (conflictKeys.length > 0) {
+        return {
+          success: false,
+          conflict: true,
+          conflictKeys: conflictKeys,
+          current: current,
+          error: 'Хтось уже змінив ці дані. Оновіть сторінку.'
+        };
+      }
+    }
+
+    // Спец-перевірки по статусу (тільки для маршрутів)
+    var newStatusLower = null;
+    if (fields['Статус'] != null) {
+      newStatusLower = String(fields['Статус']).toLowerCase();
+      if (isRoute && newStatusLower === 'cancelled') {
+        var curStatusLower = String(current['Статус'] || '').toLowerCase();
+        if (curStatusLower === 'completed') {
+          return {
+            success: false,
+            error: 'Не можна скасувати доставлену посилку. Використайте процедуру Повернення.'
+          };
+        }
+      }
+      if (newStatusLower === 'cancelled' && !str(data.cancelReason)) {
+        return { success: false, error: "Обовʼязкова причина скасування" };
+      }
+    }
+
+    // Валідація "Форма оплати"
+    if (fields['Форма оплати'] != null) {
+      var pf = String(fields['Форма оплати']).toLowerCase().trim();
+      if (PAY_FORM_VALUES.indexOf(pf) === -1) {
+        return {
+          success: false,
+          error: 'Невалідна форма оплати: "' + fields['Форма оплати'] +
+                 '". Допустимі: ' + PAY_FORM_VALUES.join(', ')
+        };
+      }
+    }
+
+    // Записуємо клітинково
+    var updated = [];
+    var rejected = [];
+    var updatedNames = [];
+    for (var f = 0; f < Object.keys(fields).length; f++) {
+      var fieldName = Object.keys(fields)[f];
+      if (whitelist.indexOf(fieldName) === -1) {
+        rejected.push({ field: fieldName, reason: 'Поле не дозволено водієм' });
+        continue;
+      }
+      var colIdx = headers.indexOf(fieldName);
+      if (colIdx === -1) {
+        rejected.push({ field: fieldName, reason: 'Колонка не знайдена в аркуші' });
+        continue;
+      }
+      sheet.getRange(rowNum, colIdx + 1).setValue(fields[fieldName]);
+      updated.push(fieldName);
+      updatedNames.push(fieldName);
+    }
+
+    // Append cancel-reason у Коментар водія (або Примітка як fallback)
+    if (newStatusLower === 'cancelled' && data.cancelReason) {
+      var targetNoteHeader = null;
+      if (headers.indexOf('Коментар водія') !== -1) targetNoteHeader = 'Коментар водія';
+      else if (headers.indexOf('Примітка') !== -1) targetNoteHeader = 'Примітка';
+      if (targetNoteHeader) {
+        var noteColIdx = headers.indexOf(targetNoteHeader);
+        var prevNote = str(current[targetNoteHeader] || '');
+        var newNote = 'Скасовано: ' + data.cancelReason + (prevNote ? ' | ' + prevNote : '');
+        sheet.getRange(rowNum, noteColIdx + 1).setValue(newNote);
+        if (updated.indexOf(targetNoteHeader) === -1) updated.push(targetNoteHeader);
+      }
+    }
+
+    // Фарбування рядка якщо змінили "Статус"
+    if (newStatusLower && STATUS_COLORS[newStatusLower]) {
+      try {
+        var colors = STATUS_COLORS[newStatusLower];
+        var totalCols = isShipping ? TOTAL_COLS_SHIP : TOTAL_COLS;
+        var readCols = Math.min(sheet.getLastColumn(), totalCols);
+        var rangeToColor = sheet.getRange(rowNum, 1, 1, readCols);
+        rangeToColor.setBackground(colors.bg);
+        rangeToColor.setBorder(true, true, true, true, true, true, colors.border, SpreadsheetApp.BorderStyle.SOLID);
+        var statusColIdx = headers.indexOf('Статус');
+        if (statusColIdx !== -1) {
+          var statusCell = sheet.getRange(rowNum, statusColIdx + 1);
+          statusCell.setFontColor(colors.font);
+          statusCell.setFontWeight('bold');
+        }
+      } catch (e) { /* фарбування не критичне */ }
+    }
+
+    // Логи
+    writeAuditLog_({
+      who: data.driverName || data.driverId || '', role: 'driver',
+      action: 'updateDriverFieldsSafe', table: 'MARHRUT', sheet: routeName,
+      recordId: itemId, field: updatedNames.join(', '),
+      newValue: updatedNames.map(function(n) { return n + '=' + fields[n]; }).join(' | '),
+      note: data.cancelReason || (rejected.length ? 'rejected: ' + rejected.map(function(r) { return r.field; }).join(',') : '')
+    });
+
+    _touchMeta_(routeName);
+
+    return { success: true, updated: updated.length, updatedFields: updated, rejected: rejected };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// ============================================
+// setupPhotoColumnCheck — перевірка що AY "Фото посилки" проставлено у всіх Маршрут_*
+// ============================================
+// Власник додав колонку вручну. Ця функція тільки попереджає якщо десь її нема
+// (наприклад при створенні нового маршруту). НЕ перезаписує автоматично.
+function setupPhotoColumnCheck() {
+  var ss = SpreadsheetApp.openById(SS.MARHRUT);
+  var sheets = ss.getSheets();
+  var missing = [];
+  var ok = [];
+  for (var i = 0; i < sheets.length; i++) {
+    var name = sheets[i].getName();
+    if (name.indexOf('Маршрут_') !== 0) continue;
+    var lastCol = sheets[i].getLastColumn();
+    if (lastCol < 51) { missing.push(name + ' (лише ' + lastCol + ' колонок)'); continue; }
+    var header = String(sheets[i].getRange(1, 51).getValue() || '').trim();
+    if (header !== 'Фото посилки') {
+      missing.push(name + ' (AY = "' + header + '")');
+    } else {
+      ok.push(name);
+    }
+  }
+  var msg = 'OK (' + ok.length + '): ' + ok.join(', ') + '\n\n';
+  msg += 'MISSING (' + missing.length + '): ' + (missing.length ? missing.join('\n') : '—');
+  SpreadsheetApp.getUi().alert('Перевірка колонки Фото посилки', msg, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+// ============================================
 // ДОПОМІЖНІ
 // ============================================
 function str(value) {
@@ -1237,6 +1621,8 @@ function respond(data) {
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('BotiLogistics CRM')
     .addItem('Список маршрутів', 'menuRoutes')
+    .addItem('Перевірити колонку Фото посилки', 'setupPhotoColumnCheck')
+    .addItem('Показати версії _meta', 'menuShowMetaVersions')
     .addToUi();
 }
 
@@ -1247,4 +1633,24 @@ function menuRoutes() {
   msg += '\nВідправки: ' + r.shipping.length + '\n';
   for (var j = 0; j < r.shipping.length; j++) msg += '  ' + r.shipping[j].name + ' — ' + r.shipping[j].count + '\n';
   SpreadsheetApp.getUi().alert('Маршрути', msg, SpreadsheetApp.getUi().ButtonSet.OK);
+}
+
+function menuShowMetaVersions() {
+  var r = apiGetRouteVersions();
+  var msg;
+  if (!r.success) {
+    msg = 'Помилка: ' + r.error;
+  } else {
+    var keys = Object.keys(r.versions);
+    if (keys.length === 0) {
+      msg = '_meta порожній (ще не було write-операцій або аркуш _meta не знайдено).';
+    } else {
+      msg = '';
+      for (var i = 0; i < keys.length; i++) {
+        var v = r.versions[keys[i]];
+        msg += keys[i] + ' — ' + new Date(v.lastModified).toISOString() + ' — ' + v.lastActor + '\n';
+      }
+    }
+  }
+  SpreadsheetApp.getUi().alert('Версії _meta', msg, SpreadsheetApp.getUi().ButtonSet.OK);
 }
