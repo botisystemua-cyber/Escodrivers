@@ -1,7 +1,7 @@
 // ============================================
 // BOTILOGISTICS DRIVERS CRM v2.0
-// Єдиний Apps Script для таблиці Marhrut_Test
-// ID: 1Ku__ll0kDvp5dCeaS6QdnHrGGeoic-rykib6N1L7jeQ
+// Єдиний Apps Script для таблиці MARHRUT
+// ID: 10SZhKV08BJyvWoMwhT0iddtWzYrDYFjCM8xgqViuE3Y
 // ============================================
 //
 // СТРУКТУРА:
@@ -12,7 +12,7 @@
 //   Зведення рейсів — зведення, ігнорується
 // ============================================
 
-var SPREADSHEET_ID = '1Ku__ll0kDvp5dCeaS6QdnHrGGeoic-rykib6N1L7jeQ';
+var SPREADSHEET_ID = '10SZhKV08BJyvWoMwhT0iddtWzYrDYFjCM8xgqViuE3Y';
 var SHEET_LOGS = 'Логи водіїв';
 
 var STATUS_COLORS = {
