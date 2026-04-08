@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Phone, MapPin, Package, ChevronUp, Info, Car, Hash,
+  Phone, MapPin, ChevronUp, Info, Car, Hash,
   CreditCard, RotateCw, CheckCircle2, XCircle, Undo2, Pencil, Banknote,
 } from 'lucide-react';
 import type { ShippingItem, ItemStatus } from '../types';

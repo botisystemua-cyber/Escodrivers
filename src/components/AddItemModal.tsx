@@ -105,7 +105,7 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
   const [recipientAddr, setRecipientAddr] = useState('');
   const [pkgDesc, setPkgDesc] = useState('');
   const [pkgWeight, setPkgWeight] = useState('');
-  const [ttn, setTtn] = useState('');
+  const [ttn] = useState('');
 
   // Відправка-specific fields
   const [internalNum, setInternalNum] = useState('');
