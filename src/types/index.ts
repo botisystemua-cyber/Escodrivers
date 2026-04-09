@@ -37,6 +37,8 @@ interface RouteItemBase {
   tag: string;
   note: string;
   smsNote: string;
+  tips: string;
+  tipsCurrency: string;
   sheet: string;
   _statusKey: string;
   _sourceRoute?: string;
@@ -91,6 +93,8 @@ export interface ShippingItem {
   status: string;
   pkgId: string;
   note: string;
+  tips: string;
+  tipsCurrency: string;
   sheet: string;
   _statusKey: string;
   _sourceRoute?: string;
@@ -124,4 +128,23 @@ export interface ExpenseAdvance {
   cashCurrency: string;
   card: number;
   cardCurrency: string;
+}
+
+export interface RouteSummary {
+  routeName: string;
+  passengers: Record<string, number>;
+  packages: Record<string, number>;
+  shipping: Record<string, number>;
+  tips: Record<string, number>;
+  income: Record<string, number>;
+  cashCollected: Record<string, number>;
+  cardCollected: Record<string, number>;
+  debts: Record<string, number>;
+  advanceCash: number;
+  advanceCashCur: string;
+  advanceCard: number;
+  advanceCardCur: string;
+  expenses: Record<string, number>;
+  expensesByCategory: Record<string, { amount: number; currency: string }>;
+  toReturn: Record<string, number>;
 }

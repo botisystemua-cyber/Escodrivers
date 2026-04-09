@@ -10,6 +10,7 @@ import { Highlight } from './Highlight';
 import { isUaEu, isEuUa } from '../utils/smsParser';
 import { MessengerPopup } from './MessengerPopup';
 import { AddressPicker } from './AddressPicker';
+import { TipsButton } from './TipsButton';
 
 interface Props { passenger: Passenger; index: number; searchQuery?: string; onEdit?: (p: Passenger) => void; }
 
@@ -32,6 +33,8 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
   const [expanded, setExpanded] = useState(false);
   const [showMessenger, setShowMessenger] = useState(false);
   const [showAddrPicker, setShowAddrPicker] = useState(false);
+  const [localTips, setLocalTips] = useState(p.tips);
+  const [localTipsCur, setLocalTipsCur] = useState(p.tipsCurrency);
 
   const show = (col: string) => !hiddenCols.has(col);
   const rawStatus = getStatus(p._statusKey);
@@ -89,6 +92,13 @@ export function PassengerCard({ passenger: p, index, searchQuery = '', onEdit }:
               </div>
             )}
           </div>
+          <TipsButton
+            tips={localTips}
+            tipsCurrency={localTipsCur}
+            routeName={routeName}
+            itemId={p.itemId}
+            onUpdated={(t, c) => { setLocalTips(t); setLocalTipsCur(c); }}
+          />
           <span className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-bold ${sl.c}`}>{sl.t}</span>
         </div>
 

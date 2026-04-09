@@ -8,6 +8,7 @@ import { useApp } from '../store/useAppStore';
 import { updateItemStatus } from '../api';
 import { Highlight } from './Highlight';
 import { isUaEu, isEuUa } from '../utils/smsParser';
+import { TipsButton } from './TipsButton';
 
 interface Props { pkg: Package; index: number; searchQuery?: string; onEdit?: (p: Package) => void; onConvertPickup?: (p: Package) => void; }
 
@@ -36,6 +37,8 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvert
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [expanded, setExpanded] = useState(false);
+  const [localTips, setLocalTips] = useState(p.tips);
+  const [localTipsCur, setLocalTipsCur] = useState(p.tipsCurrency);
 
   const show = (col: string) => !hiddenCols.has(col);
   const rawStatus = getStatus(p._statusKey);
@@ -93,6 +96,13 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvert
             {show('recipientAddr') && <div className="font-bold text-text text-[13px] leading-snug truncate">{hl(p.recipientAddr || '—')}</div>}
             {show('recipientName') && p.recipientName && <div className="text-xs text-secondary truncate">{hl(p.recipientName)}</div>}
           </div>
+          <TipsButton
+            tips={localTips}
+            tipsCurrency={localTipsCur}
+            routeName={routeName}
+            itemId={p.itemId}
+            onUpdated={(t, c) => { setLocalTips(t); setLocalTipsCur(c); }}
+          />
           <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${sl.c}`}>{sl.t}</span>
         </div>
 
