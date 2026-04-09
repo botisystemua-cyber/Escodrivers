@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, UserPlus, Package, Send, Hash, Search } from 'lucide-react';
 import { useApp } from '../store/useAppStore';
-import { addRouteItem, fetchPackages, fetchShippingItems } from '../api';
+import { addRouteItem, fetchPackages, fetchShippingItems, searchArchive } from '../api';
+import type { ArchiveMatch } from '../api';
 import { parseSmsText, directionToNapryam } from '../utils/smsParser';
 
 // Predefined cargo descriptions for autocomplete
@@ -44,6 +45,12 @@ interface PrefillData {
   addrFrom?: string;
   pkgDesc?: string;
   city?: string;
+  recipientName?: string;
+  recipientPhone?: string;
+  recipientAddr?: string;
+  pkgWeight?: string;
+  amount?: string;
+  currency?: string;
 }
 
 interface Props {
@@ -70,6 +77,14 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
     if (prefill.addrFrom) setAddrFrom(prefill.addrFrom);
     if (prefill.pkgDesc) setPkgDesc(prefill.pkgDesc);
     if (prefill.city) setCity(prefill.city);
+    if (prefill.recipientName) setRecipientName(prefill.recipientName);
+    if (prefill.recipientPhone) setRecipientPhone(prefill.recipientPhone);
+    if (prefill.recipientAddr) setRecipientAddr(prefill.recipientAddr);
+    if (prefill.pkgWeight) setPkgWeight(prefill.pkgWeight);
+    if (prefill.amount) setAmount(prefill.amount);
+    if (prefill.currency) setCurrency(prefill.currency);
+    // Skip archive search if key fields are already filled
+    if (prefill.senderPhone && prefill.recipientPhone) setArchiveFilled(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -121,6 +136,12 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
   const [contactLoaded, setContactLoaded] = useState(false);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
+  // Archive search state
+  const [archiveResults, setArchiveResults] = useState<ArchiveMatch[]>([]);
+  const [archiveTotalMatches, setArchiveTotalMatches] = useState(0);
+  const [archiveSearching, setArchiveSearching] = useState(false);
+  const [archiveFilled, setArchiveFilled] = useState(false);
+
   const isShipping = itemType === 'посилка' && direction === 'відправка';
   const isPickup = itemType === 'посилка' && direction === 'отримання';
 
@@ -155,6 +176,7 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
 
       const maxNum = nums.length > 0 ? Math.max(...nums) : 0;
       setLastInternalNum(String(maxNum));
+      setInternalNum(String(maxNum + 1));
     } catch {
       // ignore fetch errors
     } finally {
@@ -183,6 +205,31 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
 
   // Reset contact loaded flag when phone changes
   useEffect(() => { setContactLoaded(false); }, [recipientPhone]);
+
+  // Archive search — triggers on sender phone or recipient phone blur
+  const doArchiveSearch = useCallback(async (query: string) => {
+    if (archiveFilled || !query || query.trim().length < 5) return;
+    setArchiveSearching(true);
+    try {
+      const res = await searchArchive(query.trim());
+      if (res.results.length > 0) {
+        setArchiveResults(res.results);
+        setArchiveTotalMatches(res.totalMatches);
+      }
+    } catch { /* ignore */ }
+    finally { setArchiveSearching(false); }
+  }, [archiveFilled]);
+
+  const applyArchiveMatch = (match: ArchiveMatch) => {
+    if (!recipientPhone.trim() && match.recipientPhone) setRecipientPhone(match.recipientPhone);
+    if (!recipientName.trim() && match.recipientName) setRecipientName(match.recipientName);
+    if (!recipientAddr.trim() && match.recipientAddr) setRecipientAddr(match.recipientAddr);
+    setArchiveFilled(true);
+    setArchiveResults([]);
+    // Save to localStorage for future
+    if (match.recipientPhone) saveContact(match.recipientPhone, match.recipientName, match.recipientAddr);
+    showToast('Дані з архіву заповнені');
+  };
 
   // Filtered cargo suggestions
   const filteredSuggestions = pkgDesc.trim()
@@ -482,7 +529,7 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
               {/* ===== ВІДПРАВКА FORM ===== */}
               {isShipping ? (
                 <>
-                  {/* 1. Internal number */}
+                  {/* 1. Внутрішній номер */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[11px] font-semibold text-muted uppercase">
@@ -492,48 +539,86 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
                         {loadingNum ? 'Завантаження...' : lastInternalNum ? `Попередній: ${lastInternalNum}` : 'Немає записів'}
                       </span>
                     </div>
-                    <input
-                      type="text"
-                      value={internalNum}
-                      onChange={(e) => setInternalNum(e.target.value)}
+                    <input type="text" value={internalNum} onChange={(e) => setInternalNum(e.target.value)}
                       placeholder={lastInternalNum ? String(Number(lastInternalNum) + 1) : '1'}
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text placeholder:text-gray-300 focus:outline-none focus:border-brand font-bold text-center text-lg"
-                    />
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text placeholder:text-gray-300 focus:outline-none focus:border-brand font-bold text-center text-lg" />
                   </div>
 
-                  {/* 2. Recipient data */}
+                  {/* 2. Відправник (тригер пошуку #1) */}
+                  <div className="bg-emerald-50/50 rounded-xl p-2.5 space-y-2">
+                    <label className="text-[11px] font-semibold text-emerald-600 uppercase">Відправник</label>
+                    <div className="relative">
+                      <Field label="Тел. або ІД *" value={senderPhone} onChange={setSenderPhone} placeholder="+380... або ID"
+                        onBlur={() => doArchiveSearch(senderPhone)} />
+                      {senderPhone.trim().length >= 5 && !archiveFilled && (
+                        <button onClick={() => doArchiveSearch(senderPhone)}
+                          className="absolute right-2 top-6 p-1 rounded-lg hover:bg-emerald-100 cursor-pointer">
+                          <Search className="w-3.5 h-3.5 text-emerald-500" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 3. Отримувач (тригер пошуку #2) */}
                   <div className="bg-blue-50/50 rounded-xl p-2.5 space-y-2">
                     <label className="text-[11px] font-semibold text-blue-600 uppercase">Отримувач</label>
-                    <Field label="ПІБ" value={recipientName} onChange={setRecipientName} placeholder="ПІБ отримувача" />
                     <div className="relative">
-                      <Field label="Телефон *" value={recipientPhone} onChange={setRecipientPhone} placeholder="+380..." type="tel" onBlur={handleRecipientPhoneBlur} />
-                      {recipientPhone.trim() && !contactLoaded && (
-                        <button onClick={handleRecipientPhoneBlur}
+                      <Field label="Телефон *" value={recipientPhone} onChange={setRecipientPhone} placeholder="+380..." type="tel"
+                        onBlur={() => { handleRecipientPhoneBlur(); doArchiveSearch(recipientPhone); }} />
+                      {recipientPhone.trim().length >= 5 && !archiveFilled && (
+                        <button onClick={() => doArchiveSearch(recipientPhone)}
                           className="absolute right-2 top-6 p-1 rounded-lg hover:bg-blue-100 cursor-pointer">
                           <Search className="w-3.5 h-3.5 text-blue-400" />
                         </button>
                       )}
                     </div>
+                    <Field label="ПІБ" value={recipientName} onChange={setRecipientName} placeholder="ПІБ отримувача" />
                     <Field label="Адреса" value={recipientAddr} onChange={setRecipientAddr} placeholder="Місто, вулиця..." />
                   </div>
 
-                  {/* 3. Cargo description with autocomplete */}
+                  {/* Archive search results popup */}
+                  {archiveSearching && (
+                    <div className="text-center text-[11px] text-blue-500 font-semibold py-2">Пошук в архіві...</div>
+                  )}
+                  {archiveResults.length > 0 && (
+                    <div className="bg-violet-50 border border-violet-200 rounded-xl p-2 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-violet-700">Знайдено в архіві:</span>
+                        {archiveTotalMatches > 5 && (
+                          <span className="text-[10px] font-semibold text-violet-500">ще {archiveTotalMatches - 5} записів</span>
+                        )}
+                      </div>
+                      {archiveResults.map((m, i) => (
+                        <button key={i} onClick={() => applyArchiveMatch(m)}
+                          className="w-full text-left px-2.5 py-2 bg-white rounded-lg border border-violet-100 hover:border-violet-300 cursor-pointer transition-all active:scale-[0.98]">
+                          <div className="text-[12px] font-bold text-text">{m.recipientName || '—'}</div>
+                          <div className="text-[10px] text-secondary">{m.recipientPhone} {m.recipientAddr ? '· ' + m.recipientAddr : ''}</div>
+                          <div className="text-[9px] text-violet-400 mt-0.5">{m.dateArchive} · {m.senderPhone}</div>
+                          {archiveTotalMatches > 3 && i === 0 && (
+                            <div className="text-[9px] font-bold text-amber-600 mt-0.5">Мін. {archiveTotalMatches} заявок на цю людину</div>
+                          )}
+                        </button>
+                      ))}
+                      <button onClick={() => setArchiveResults([])}
+                        className="w-full text-center text-[10px] text-violet-400 hover:text-violet-600 py-1 cursor-pointer">
+                        Закрити
+                      </button>
+                    </div>
+                  )}
+
+                  {/* 4. Опис вантажу з автокомплітом */}
                   <div ref={suggestionsRef}>
                     <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Опис вантажу</label>
-                    <input
-                      type="text"
-                      value={pkgDesc}
+                    <input type="text" value={pkgDesc}
                       onChange={(e) => { setPkgDesc(e.target.value); setShowSuggestions(true); }}
                       onFocus={() => setShowSuggestions(true)}
                       onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
                       placeholder="Почніть вводити..."
-                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text placeholder:text-gray-300 focus:outline-none focus:border-brand"
-                    />
+                      className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-text placeholder:text-gray-300 focus:outline-none focus:border-brand" />
                     {showSuggestions && filteredSuggestions.length > 0 && (
                       <div className="mt-1 bg-white border border-gray-200 rounded-xl shadow-sm max-h-32 overflow-y-auto">
                         {filteredSuggestions.map((s) => (
-                          <button key={s}
-                            onMouseDown={(e) => e.preventDefault()}
+                          <button key={s} onMouseDown={(e) => e.preventDefault()}
                             onClick={() => { setPkgDesc(s); setShowSuggestions(false); }}
                             className="w-full text-left px-3 py-2 text-sm text-text hover:bg-blue-50 cursor-pointer first:rounded-t-xl last:rounded-b-xl">
                             {s}
@@ -543,7 +628,7 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
                     )}
                   </div>
 
-                  {/* 4. К-сть місць + Вага */}
+                  {/* 5. К-сть місць + Вага */}
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-[11px] font-semibold text-muted uppercase mb-1">К-сть місць</label>
@@ -559,7 +644,7 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
                     <Field label="Вага (кг)" value={pkgWeight} onChange={setPkgWeight} placeholder="кг" type="number" />
                   </div>
 
-                  {/* 5. Оціночна вартість */}
+                  {/* 6. Оціночна вартість */}
                   <div>
                     <label className="block text-[11px] font-semibold text-muted uppercase mb-1">Оціночна вартість *</label>
                     <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
@@ -573,12 +658,6 @@ export function AddItemModal({ onClose, onAdded, defaultType = 'посилка',
                           }`}>{v}</button>
                       ))}
                     </div>
-                  </div>
-
-                  {/* 6. Sender */}
-                  <div className="bg-emerald-50/50 rounded-xl p-2.5 space-y-2">
-                    <label className="text-[11px] font-semibold text-emerald-600 uppercase">Відправник</label>
-                    <Field label="Тел. або ІД *" value={senderPhone} onChange={setSenderPhone} placeholder="+380... або ID" />
                   </div>
 
                   {/* 7. Оплата */}

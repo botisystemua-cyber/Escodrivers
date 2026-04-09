@@ -24,6 +24,14 @@ const stLabel: Record<ItemStatus, { t: string; c: string }> = {
   cancelled: { t: 'Скасов.', c: 'text-red-700 bg-red-50' },
 };
 
+function derivePayStatus(payForm?: string): { label: string; cls: string } {
+  const f = (payForm || '').toLowerCase().trim();
+  if (f === 'готівка' || f === 'картка') return { label: 'Оплачено', cls: 'text-emerald-700 bg-emerald-50' };
+  if (f === 'частково') return { label: 'Частково', cls: 'text-amber-700 bg-amber-50' };
+  if (f === 'наложка') return { label: 'Наложка', cls: 'text-red-600 bg-red-50' };
+  return { label: 'Борг', cls: 'text-red-600 bg-red-50' };
+}
+
 export function ShippingCard({ item, index, onEdit }: Props) {
   const { getStatus, setStatus, driverName, isUnifiedView, showToast } = useApp();
   const [expanded, setExpanded] = useState(false);
@@ -101,6 +109,11 @@ export function ShippingCard({ item, index, onEdit }: Props) {
               <Banknote className="w-3 h-3" />{item.debt}{item.currency ? ' ' + item.currency : ''}
             </span>
           )}
+          {(() => { const ps = derivePayStatus(item.payForm); return (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ps.cls}`}>
+              {ps.label}
+            </span>
+          ); })()}
           {item.payForm && (
             <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full">
               {item.payForm}
@@ -149,7 +162,7 @@ export function ShippingCard({ item, index, onEdit }: Props) {
             {item.amount && <Cell label="Оціночна вартість" value={item.amount} />}
             {item.debt && <Cell label="Оплата клієнта" value={item.debt + (item.currency ? ' ' + item.currency : '')} />}
             {item.payForm && <Cell label="Форма оплати" value={item.payForm} />}
-            {item.payStatus && <Cell label="Ст. оплати" value={item.payStatus} />}
+            <Cell label="Ст. оплати" value={derivePayStatus(item.payForm).label} bold accent={derivePayStatus(item.payForm).label === 'Оплачено' ? 'green' : derivePayStatus(item.payForm).label === 'Частково' ? 'amber' : 'red'} />
             {item.deposit && <Cell label="Пакетик" value={item.deposit + (item.depositCurrency ? ' ' + item.depositCurrency : '')} />}
             {item.senderName && <Cell label="Відправник" value={item.senderName} />}
             {item.dateTrip && <Cell label="Дата рейсу" value={item.dateTrip} />}
@@ -170,12 +183,13 @@ export function ShippingCard({ item, index, onEdit }: Props) {
   );
 }
 
-function Cell({ label, value, full }: { label: string; value?: string; full?: boolean }) {
+function Cell({ label, value, full, bold, accent }: { label: string; value?: string; full?: boolean; bold?: boolean; accent?: 'green' | 'red' | 'amber' }) {
   if (!value) return null;
+  const vc = accent === 'green' ? 'text-emerald-700' : accent === 'red' ? 'text-red-600' : accent === 'amber' ? 'text-amber-700' : 'text-text';
   return (
     <div className={`py-1 min-w-0 ${full ? 'col-span-2' : ''}`}>
       <div className="text-[9px] text-muted font-semibold uppercase tracking-wide">{label}</div>
-      <div className="text-[11px] font-medium text-text truncate">{value}</div>
+      <div className={`text-[11px] ${bold ? 'font-bold' : 'font-medium'} ${vc} truncate`}>{value}</div>
     </div>
   );
 }

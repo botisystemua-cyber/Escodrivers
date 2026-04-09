@@ -22,6 +22,14 @@ const stLabel: Record<ItemStatus, { t: string; c: string }> = {
   cancelled: { t: 'Скасов.', c: 'text-red-700 bg-red-50' },
 };
 
+function derivePayStatus(payForm?: string): { label: string; cls: string } {
+  const f = (payForm || '').toLowerCase().trim();
+  if (f === 'готівка' || f === 'картка') return { label: 'Оплачено', cls: 'text-emerald-700 bg-emerald-50' };
+  if (f === 'частково') return { label: 'Частково', cls: 'text-amber-700 bg-amber-50' };
+  if (f === 'наложка') return { label: 'Наложка', cls: 'text-red-600 bg-red-50' };
+  return { label: 'Борг', cls: 'text-red-600 bg-red-50' };
+}
+
 export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvertPickup }: Props) {
   const hl = (text: string) => <Highlight text={text} query={searchQuery} />;
   const { getStatus, setStatus, hiddenCols, driverName, currentSheet, isUnifiedView, showToast } = useApp();
@@ -91,7 +99,9 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvert
         <div className="flex items-center gap-2 ml-9 mb-2 flex-wrap">
           {show('recipientPhone') && p.recipientPhone && <Chip icon={Phone} c="green">{hl(p.recipientPhone)}</Chip>}
           {show('amount') && p.amount && <Chip icon={CreditCard} c="green" b>{p.amount} {p.currency}</Chip>}
-          {show('payStatus') && p.payStatus && <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${p.payStatus === 'Оплачено' ? 'text-emerald-700 bg-emerald-50' : 'text-red-600 bg-red-50'}`}>{p.payStatus}</span>}
+          {show('payStatus') && (() => { const ps = derivePayStatus(p.payForm); return (
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ps.cls}`}>{ps.label}</span>
+          ); })()}
           {show('dateTrip') && p.dateTrip && <Chip icon={Calendar} c="gray">{p.dateTrip}</Chip>}
         </div>
 
@@ -144,7 +154,7 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvert
             <Cell label="Напрям" value={p.direction} />
             <Cell label="Сума" value={p.amount ? p.amount + ' ' + p.currency : ''} bold accent="green" />
             <Cell label="Оплата" value={p.payForm} />
-            <Cell label="Ст. оплати" value={p.payStatus} bold accent={p.payStatus === 'Оплачено' ? 'green' : 'red'} />
+            <Cell label="Ст. оплати" value={derivePayStatus(p.payForm).label} bold accent={derivePayStatus(p.payForm).label === 'Оплачено' ? 'green' : derivePayStatus(p.payForm).label === 'Частково' ? 'amber' : 'red'} />
             <Cell label="Борг" value={p.debt} accent="red" />
             <Cell label="Тег" value={p.tag} />
           </div>
@@ -164,9 +174,9 @@ export function PackageCard({ pkg: p, index, searchQuery = '', onEdit, onConvert
   );
 }
 
-function Cell({ label, value, bold, accent, full }: { label: string; value?: string; bold?: boolean; accent?: 'green' | 'red'; full?: boolean }) {
+function Cell({ label, value, bold, accent, full }: { label: string; value?: string; bold?: boolean; accent?: 'green' | 'red' | 'amber'; full?: boolean }) {
   if (!value) return null;
-  const vc = accent === 'green' ? 'text-emerald-700' : accent === 'red' ? 'text-red-600' : 'text-text';
+  const vc = accent === 'green' ? 'text-emerald-700' : accent === 'red' ? 'text-red-600' : accent === 'amber' ? 'text-amber-700' : 'text-text';
   return (<div className={`py-1 min-w-0 ${full ? 'col-span-2' : ''}`}><div className="text-[9px] text-muted font-semibold uppercase tracking-wide">{label}</div><div className={`text-[11px] ${bold ? 'font-bold' : 'font-medium'} ${vc} truncate`}>{value}</div></div>);
 }
 function Chip({ icon: I, c, b, children }: { icon: typeof Phone; c: string; b?: boolean; children: React.ReactNode }) {

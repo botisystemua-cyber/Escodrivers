@@ -243,6 +243,12 @@ function doGet(e) {
         return respond(getExpenses(sheet));
       case 'getRouteVersions':
         return respond(apiGetRouteVersions());
+      case 'getSheetRows':
+        if (!sheet) return respond({ success: false, error: 'Не вказано sheet' });
+        return respond(apiGetSheetRows(sheet));
+      case 'searchArchive':
+        var q = (e && e.parameter) ? (e.parameter.q || '') : '';
+        return respond(searchArchive(q));
       default:
         return respond({ success: false, error: 'Невідома GET дія: ' + action });
     }
@@ -282,6 +288,8 @@ function doPost(e) {
         return respond(handleUpdateDriverFieldsSafe(data));
       case 'getRouteVersions':
         return respond(apiGetRouteVersions());
+      case 'getSheetRows':
+        return respond(apiGetSheetRows(payload.sheetName || ''));
       case 'getExpenses':
         return respond(getExpenses(payload.sheetName || ''));
       case 'addExpense':
@@ -294,6 +302,8 @@ function doPost(e) {
         return respond(handleRecordPayment(data));
       case 'rateClient':
         return respond(handleRateClient(data));
+      case 'searchArchive':
+        return respond(searchArchive(payload.query || payload.q || ''));
       default:
         return respond({ success: false, error: 'Невідома дія: ' + action });
     }
@@ -303,47 +313,45 @@ function doPost(e) {
 }
 
 // ============================================
-// getAvailableRoutes — динамічний список
+// getAvailableRoutes — динамічний список з усіх аркушів MARHRUT
 // ============================================
-// Маршрути відомі заздалегідь — не скануємо таблицю (занадто повільно)
-var KNOWN_ROUTES = ['Маршрут_1', 'Маршрут_2', 'Маршрут_3'];
-var KNOWN_SHIPPING = [
-  { name: 'Відправка_1', label: 'Відправка 1' },
-  { name: 'Відправка_2', label: 'Відправка 2' },
-  { name: 'Відправка_3', label: 'Відправка 3' },
-];
-
+// Сканує всі аркуші типу Маршрут_* і Відправка_*, виключає шаблони/логи/_meta.
+// Раніше було hardcoded на Маршрут_1/2/3 — не покривало Маршрут_Цюріх,
+// _Женева, _Запасний (тощо).
 function getAvailableRoutes() {
   var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  var allSheets = ss.getSheets();
+
   var routes = [];
-  for (var i = 0; i < KNOWN_ROUTES.length; i++) {
-    var count = 0, paxCount = 0, pkgCount = 0;
-    try {
-      var sheet = ss.getSheetByName(KNOWN_ROUTES[i]);
-      if (sheet) {
-        var lastRow = sheet.getLastRow();
-        count = Math.max(0, lastRow - 1);
-        if (count > 0) {
+  var shipping = [];
+
+  for (var s = 0; s < allSheets.length; s++) {
+    var sheet = allSheets[s];
+    var name = sheet.getName();
+    if (isExcludedSheet_(name)) continue;
+
+    if (name.indexOf('Маршрут_') === 0) {
+      var lastRow = sheet.getLastRow();
+      var count = Math.max(0, lastRow - 1);
+      var paxCount = 0, pkgCount = 0;
+      if (count > 0) {
+        try {
           var types = sheet.getRange(2, COL.TYPE + 1, count, 1).getValues();
           for (var t = 0; t < types.length; t++) {
             var tv = String(types[t][0] || '').toLowerCase();
             if (tv.indexOf('пасажир') >= 0) paxCount++;
             else if (tv.indexOf('посилк') >= 0) pkgCount++;
           }
-        }
+        } catch (e) { /* skip */ }
       }
-    } catch (e) { /* sheet not found */ }
-    routes.push({ name: KNOWN_ROUTES[i], count: count, paxCount: paxCount, pkgCount: pkgCount });
+      routes.push({ name: name, count: count, paxCount: paxCount, pkgCount: pkgCount });
+    } else if (name.indexOf('Відправка_') === 0) {
+      var sCount = Math.max(0, sheet.getLastRow() - 1);
+      var label = name.replace('Відправка_', 'Відправка ');
+      shipping.push({ name: name, label: label, count: sCount });
+    }
   }
-  var shipping = [];
-  for (var j = 0; j < KNOWN_SHIPPING.length; j++) {
-    var sCount = 0;
-    try {
-      var sSheet = ss.getSheetByName(KNOWN_SHIPPING[j].name);
-      if (sSheet) sCount = Math.max(0, sSheet.getLastRow() - 1);
-    } catch (e) { /* sheet not found */ }
-    shipping.push({ name: KNOWN_SHIPPING[j].name, label: KNOWN_SHIPPING[j].label, count: sCount });
-  }
+
   return { success: true, routes: routes, shipping: shipping };
 }
 
@@ -526,10 +534,11 @@ function handleDriverStatusUpdate(data) {
       return { success: false, error: 'Невалідний статус: ' + (data.status || '(пусто)') + '. Допустимі: ' + VALID_STATUSES.join(', ') };
     }
 
-    // Валідація маршруту — дозволяємо Маршрут_* та Відправка_*
+    // Валідація маршруту — дозволяємо Маршрут_* та Відправка_* (будь-який суфікс крім шаблонів)
     var routeName = data.routeName || '';
     var isShipping = routeName.indexOf('Відправка_') === 0;
-    if (!routeName || (!isShipping && !/^Маршрут_\d+$/.test(routeName))) {
+    var isRoute = routeName.indexOf('Маршрут_') === 0;
+    if (!routeName || (!isShipping && !isRoute) || isExcludedSheet_(routeName)) {
       return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
     }
 
@@ -657,7 +666,7 @@ function handleDriverStatusUpdate(data) {
 function handleAddRouteItem(data) {
   try {
     var routeName = data.routeName;
-    if (!routeName || !/^Маршрут_\d+$/.test(routeName)) {
+    if (!routeName || routeName.indexOf('Маршрут_') !== 0 || isExcludedSheet_(routeName)) {
       return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
     }
 
@@ -685,7 +694,8 @@ function handleAddRouteItem(data) {
 
       var shipRow = new Array(TOTAL_COLS_SHIP).fill('');
       shipRow[COL_SHIP.DISPATCH_ID] = dispatchId;
-      shipRow[COL_SHIP.DATE_CREATED] = dateStr;
+      shipRow[COL_SHIP.DATE_CREATED] = dateStr + ' ' + timeStr;
+      shipRow[COL_SHIP.RTE_ID] = routeName;
       shipRow[COL_SHIP.DATE_TRIP] = data.dateTrip || '';
       shipRow[COL_SHIP.DRIVER] = data.driverName || '';
       shipRow[COL_SHIP.SENDER_PHONE] = data.senderPhone || '';
@@ -950,7 +960,7 @@ function getExpenses(sheetName) {
 function handleAddExpense(data) {
   try {
     var routeName = data.routeName;
-    if (!routeName || !/^Маршрут_\d+$/.test(routeName)) {
+    if (!routeName || routeName.indexOf('Маршрут_') !== 0 || isExcludedSheet_(routeName)) {
       return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
     }
 
@@ -1014,7 +1024,7 @@ function handleAddExpense(data) {
 function handleDeleteExpense(data) {
   try {
     var routeName = data.routeName;
-    if (!routeName || !/^Маршрут_\d+$/.test(routeName)) {
+    if (!routeName || routeName.indexOf('Маршрут_') !== 0 || isExcludedSheet_(routeName)) {
       return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
     }
 
@@ -1366,6 +1376,130 @@ function apiGetRouteVersions() {
       };
     }
     return { success: true, versions: versions };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// ============================================
+// apiGetSheetRows — проксі читання приватної таблиці MARHRUT через бекенд
+// ============================================
+// Потрібен бо фронт (React у браузері водія) не може читати приватну
+// Google Sheet напряму через gviz CSV — Google редиректить на ServiceLogin
+// і браузер блокує CORS. Apps Script виконується серверно під власником
+// таблиці, тому має повний доступ навіть до приватних аркушів.
+//
+// Вхід: sheetName — назва аркуша у MARHRUT
+// Вихід: { success: true, sheetName, rows: string[][] } або { success: false, error }
+//
+// Дати серіалізуються в ISO-рядки (Europe/Kiev) щоб JSON не падав.
+function apiGetSheetRows(sheetName) {
+  try {
+    if (!sheetName) return { success: false, error: 'Не вказано sheet' };
+    if (isExcludedSheet_(sheetName)) {
+      return { success: false, error: 'Аркуш заборонено: ' + sheetName };
+    }
+    var ss = SpreadsheetApp.openById(SS.MARHRUT);
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return { success: false, error: 'Аркуш не знайдено: ' + sheetName };
+
+    var lastRow = sheet.getLastRow();
+    var lastCol = sheet.getLastColumn();
+    if (lastRow < 1 || lastCol < 1) {
+      return { success: true, sheetName: sheetName, rows: [] };
+    }
+    var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+    // Серіалізуємо дати в ISO-рядки щоб JSON не ламався на Date-об'єктах
+    for (var i = 0; i < values.length; i++) {
+      for (var j = 0; j < values[i].length; j++) {
+        if (values[i][j] instanceof Date) {
+          values[i][j] = Utilities.formatDate(
+            values[i][j], 'Europe/Kiev', 'yyyy-MM-dd HH:mm:ss'
+          );
+        }
+      }
+    }
+    return { success: true, sheetName: sheetName, rows: values };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// ============================================
+// searchArchive — пошук у Archive.Посилки по телефону/ID
+// ============================================
+// Вхід: { query: '+380...' або 'CLI-...' }
+// Шукає по: Телефон реєстратора (13), Телефон отримувача (15), CLI_ID (8)
+// Повертає: топ-5 найновіших збігів + totalMatches
+function searchArchive(query) {
+  try {
+    if (!query || String(query).trim().length < 3) {
+      return { success: false, error: 'Запит занадто короткий (мін. 3 символи)' };
+    }
+    var q = String(query).trim().replace(/[^0-9a-zA-Z+\-_]/g, '');
+    if (!q) return { success: false, error: 'Невалідний запит' };
+
+    var ss = SpreadsheetApp.openById(SS.ARCHIVE);
+    var sheet = ss.getSheetByName('Посилки');
+    if (!sheet) return { success: false, error: 'Аркуш Посилки не знайдено в архіві' };
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < 2) return { success: true, results: [], totalMatches: 0 };
+
+    var data = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+
+    // Archive Посилки column indices
+    var COL_A = {
+      DATE_ARCHIVE: 2, PKG_ID: 7, CLI_ID: 8,
+      SENDER_NAME: 12, SENDER_PHONE: 13,
+      RECIPIENT_NAME: 14, RECIPIENT_PHONE: 15, RECIPIENT_ADDR: 16
+    };
+
+    var matches = [];
+    for (var i = 0; i < data.length; i++) {
+      var row = data[i];
+      var senderPhone = String(row[COL_A.SENDER_PHONE] || '').replace(/\s/g, '');
+      var recipientPhone = String(row[COL_A.RECIPIENT_PHONE] || '').replace(/\s/g, '');
+      var cliId = String(row[COL_A.CLI_ID] || '').replace(/\s/g, '');
+
+      var matched = false;
+      if (senderPhone && senderPhone.indexOf(q) >= 0) matched = true;
+      if (recipientPhone && recipientPhone.indexOf(q) >= 0) matched = true;
+      if (cliId && cliId.indexOf(q) >= 0) matched = true;
+
+      if (matched) {
+        var dateVal = row[COL_A.DATE_ARCHIVE];
+        var dateStr = '';
+        if (dateVal instanceof Date) {
+          dateStr = Utilities.formatDate(dateVal, 'Europe/Kiev', 'yyyy-MM-dd');
+        } else {
+          dateStr = String(dateVal || '');
+        }
+        matches.push({
+          dateArchive: dateStr,
+          pkgId: String(row[COL_A.PKG_ID] || ''),
+          cliId: String(row[COL_A.CLI_ID] || ''),
+          senderName: String(row[COL_A.SENDER_NAME] || ''),
+          senderPhone: senderPhone,
+          recipientName: String(row[COL_A.RECIPIENT_NAME] || ''),
+          recipientPhone: recipientPhone,
+          recipientAddr: String(row[COL_A.RECIPIENT_ADDR] || ''),
+          _rowIdx: i
+        });
+      }
+    }
+
+    var totalMatches = matches.length;
+
+    // Сортуємо по даті (найновіші першими)
+    matches.sort(function(a, b) {
+      return a.dateArchive > b.dateArchive ? -1 : a.dateArchive < b.dateArchive ? 1 : 0;
+    });
+
+    // Повертаємо топ-5
+    var top = matches.slice(0, 5);
+
+    return { success: true, results: top, totalMatches: totalMatches };
   } catch (err) {
     return { success: false, error: err.toString() };
   }

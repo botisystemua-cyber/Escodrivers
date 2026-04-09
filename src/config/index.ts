@@ -1,15 +1,18 @@
 export const CONFIG = {
   COMPANY_NAME: 'BotiLogistics',
-  // Google Sheets ID для прямого читання через gviz API
+  // Google Sheets ID — залишено лише як довідкове значення, фронт більше
+  // не читає таблицю напряму (див. fetchSheet у src/api/index.ts).
   SPREADSHEET_ID: '10SZhKV08BJyvWoMwhT0iddtWzYrDYFjCM8xgqViuE3Y',
-  // Apps Script — тільки для запису (updateDriverStatus)
+  // Apps Script Web App — ЄДИНА точка входу (читання + запис).
+  // Читання приватної таблиці проксюється через apiGetSheetRows у бекенді.
   API_URL:
-    'https://script.google.com/macros/s/AKfycbzIXx_hizxLfUFaqdgaR9bkkvNnN2Bvmvvh7_wFin80HcQbbW-AUK_iKHYQiQsgNzP1Gw/exec',
-  // Маршрути (hardcoded)
-  ROUTES: ['Маршрут_1', 'Маршрут_2', 'Маршрут_3'],
+    'https://script.google.com/macros/s/AKfycbyDFpJzq2e7qzQXmy9ecB4C95jchHpjb2hejK5S44Jdq_bbAgJ-pG2c2NwP4zI-MhT25g/exec',
+  // Fallback маршрути — використовуються лише якщо Apps Script недоступний.
+  // Реальний список повертає GAS getAvailableRoutes (динамічне сканування).
+  ROUTES: ['Маршрут_Цюріх', 'Маршрут_Женева', 'Маршрут_Запасний'],
   SHIPPING: [
-    { name: 'Відправка_1', label: 'Відправка 1' },
-    { name: 'Відправка_2', label: 'Відправка 2' },
-    { name: 'Відправка_3', label: 'Відправка 3' },
+    { name: 'Відправка_Цюріх', label: 'Відправка Цюріх' },
+    { name: 'Відправка_Женева', label: 'Відправка Женева' },
+    { name: 'Відправка_Запасний', label: 'Відправка Запасний' },
   ],
 };

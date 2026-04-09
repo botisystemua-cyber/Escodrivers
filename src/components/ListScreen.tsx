@@ -7,7 +7,7 @@ import { useApp } from '../store/useAppStore';
 import { ThemeSplash } from './ThemeSplash';
 import type { Theme } from '../store/useAppStore';
 import { isUaEu, isEuUa } from '../utils/smsParser';
-import { fetchPassengers, fetchPackages, fetchShippingItems } from '../api';
+import { fetchPassengers, fetchPackages, fetchShippingItems, updateItemStatus } from '../api';
 import { PassengerCard } from './PassengerCard';
 import { PackageCard } from './PackageCard';
 import { ShippingCard } from './ShippingCard';
@@ -22,7 +22,7 @@ export function ListScreen() {
     currentSheet, isUnifiedView, goBack, showToast, setCurrentScreen,
     statusFilter, setStatusFilter, getStatus, setStatus,
     routeFilter, setRouteFilter, routes, shippingRoutes,
-    viewTab, setViewTab,
+    viewTab, setViewTab, driverName,
     theme, setTheme,
   } = useApp();
 
@@ -451,19 +451,29 @@ export function ListScreen() {
       {convertingPickup && (
         <AddItemModal
           onClose={() => setConvertingPickup(null)}
-          onAdded={() => {
-            setStatus(convertingPickup._statusKey, 'completed');
-            showToast('Заїзд оформлено як відправку');
+          onAdded={async () => {
+            const pkg = convertingPickup;
+            const rn = isUnifiedView && pkg._sourceRoute ? pkg._sourceRoute : currentSheet;
+            setStatus(pkg._statusKey, 'completed');
+            try { await updateItemStatus(driverName, rn, pkg, 'completed'); }
+            catch { /* status already set locally */ }
+            showToast('Відправку створено, посилку закрито');
             refresh();
           }}
           defaultType="посилка"
           forceShipping
           prefill={{
             senderName: convertingPickup.senderName,
-            senderPhone: convertingPickup.senderPhone,
+            senderPhone: convertingPickup.senderPhone || convertingPickup.phone,
             addrFrom: convertingPickup.addrFrom,
             pkgDesc: convertingPickup.pkgDesc,
             city: convertingPickup.city,
+            recipientName: convertingPickup.recipientName,
+            recipientPhone: convertingPickup.recipientPhone,
+            recipientAddr: convertingPickup.recipientAddr,
+            pkgWeight: convertingPickup.pkgWeight,
+            amount: convertingPickup.amount,
+            currency: convertingPickup.currency,
           }}
         />
       )}

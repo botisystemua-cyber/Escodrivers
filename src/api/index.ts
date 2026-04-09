@@ -1,58 +1,59 @@
 import { CONFIG } from '../config';
 import type { Route, ShippingRoute, Passenger, Package, ShippingItem, RouteItem, ExpenseItem, ExpenseAdvance } from '../types';
 
-// ============================================
-// Читання через Google Sheets gviz API (публічна таблиця)
-// Це НАБАГАТО швидше ніж Apps Script
-// ============================================
-
-async function fetchSheet(sheetName: string): Promise<string[][]> {
-  const url = `https://docs.google.com/spreadsheets/d/${CONFIG.SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-  const response = await fetch(url);
-  if (!response.ok) throw new Error('Не вдалося завантажити: ' + sheetName);
-  const csv = await response.text();
-  return parseCsv(csv);
+// POST-запит до GAS з таймаутом 30 сек
+async function gasPost(action: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(CONFIG.API_URL, {
+      method: 'POST',
+      redirect: 'follow',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action, ...data }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+    const text = await response.text();
+    try { return JSON.parse(text); }
+    catch { throw new Error('GAS повернув не-JSON: ' + text.slice(0, 120)); }
+  } catch (err) {
+    clearTimeout(timer);
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('Таймаут — GAS не відповів за 30 секунд');
+    }
+    throw err;
+  }
 }
 
-function parseCsv(csv: string): string[][] {
-  const rows: string[][] = [];
-  let current = '';
-  let inQuotes = false;
-  let row: string[] = [];
+// ============================================
+// Читання аркушів MARHRUT через Apps Script backend (apiGetSheetRows)
+// ============================================
+// Раніше тут був прямий fetch gviz CSV, але він вимагав публічної таблиці
+// (у браузера водія немає прав на приватний Sheet → Google редиректив на
+// ServiceLogin → CORS ламав запит). Apps Script виконується серверно під
+// акаунтом власника, тому має повний доступ навіть коли MARHRUT приватна.
 
-  for (let i = 0; i < csv.length; i++) {
-    const ch = csv[i];
-    if (inQuotes) {
-      if (ch === '"' && csv[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else if (ch === '"') {
-        inQuotes = false;
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ',') {
-        row.push(current);
-        current = '';
-      } else if (ch === '\n' || (ch === '\r' && csv[i + 1] === '\n')) {
-        row.push(current);
-        current = '';
-        if (row.some((c) => c.trim())) rows.push(row);
-        row = [];
-        if (ch === '\r') i++;
-      } else {
-        current += ch;
-      }
-    }
+async function fetchSheet(sheetName: string): Promise<string[][]> {
+  const url = CONFIG.API_URL + '?action=getSheetRows&sheet=' + encodeURIComponent(sheetName);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(timer);
+    if (!response.ok) throw new Error('Не вдалося завантажити: ' + sheetName);
+    const text = await response.text();
+    let data: { success?: boolean; error?: string; rows?: unknown[][] };
+    try { data = JSON.parse(text); }
+    catch { throw new Error('GAS повернув не-JSON: ' + text.slice(0, 120)); }
+    if (!data.success) throw new Error(data.error || 'Не вдалося завантажити: ' + sheetName);
+    return (data.rows || []).map((row: unknown[]) =>
+      row.map((cell) => (cell == null ? '' : String(cell)))
+    );
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
   }
-  if (current || row.length) {
-    row.push(current);
-    if (row.some((c) => c.trim())) rows.push(row);
-  }
-  return rows;
 }
 
 // Column indices for Маршрут sheets (matching .gs COL)
@@ -89,7 +90,8 @@ function buildCommon(row: string[], sheetName: string, rowNum: number) {
     rteId: val(row, C.RTE_ID),
     type: val(row, C.TYPE),
     direction: val(row, C.DIRECTION),
-    itemId: val(row, C.ITEM_ID),
+    // Fallback: якщо окрема колонка ITEM_ID порожня, беремо RTE_ID (старий формат)
+    itemId: val(row, C.ITEM_ID) || val(row, C.RTE_ID),
     dateCreated: val(row, C.DATE_CREATED),
     dateTrip: val(row, C.DATE_TRIP),
     timing: val(row, C.TIMING),
@@ -118,7 +120,10 @@ function buildCommon(row: string[], sheetName: string, rowNum: number) {
 // ---- Routes (fetch real counts from Apps Script) ----
 export async function fetchRoutes(): Promise<{ routes: Route[]; shipping: ShippingRoute[] }> {
   try {
-    const response = await fetch(CONFIG.API_URL + '?action=getAvailableRoutes');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(CONFIG.API_URL + '?action=getAvailableRoutes', { signal: controller.signal });
+    clearTimeout(timer);
     const text = await response.text();
     const data = JSON.parse(text);
     if (data.success) return { routes: data.routes, shipping: data.shipping };
@@ -138,7 +143,8 @@ export async function fetchPassengers(sheetName: string): Promise<Passenger[]> {
     const row = rows[i];
     const type = val(row, C.TYPE).toLowerCase();
     if (type !== 'пасажир') continue;
-    if (!val(row, C.ITEM_ID)) continue;
+    // Пропускаємо лише якщо немає жодного ідентифікатора
+    if (!val(row, C.ITEM_ID) && !val(row, C.RTE_ID)) continue;
 
     items.push({
       ...buildCommon(row, sheetName, i + 1),
@@ -162,7 +168,8 @@ export async function fetchPackages(sheetName: string): Promise<Package[]> {
     const row = rows[i];
     const type = val(row, C.TYPE).toLowerCase();
     if (type !== 'посилка') continue;
-    if (!val(row, C.ITEM_ID)) continue;
+    // Пропускаємо лише якщо немає жодного ідентифікатора
+    if (!val(row, C.ITEM_ID) && !val(row, C.RTE_ID)) continue;
 
     items.push({
       ...buildCommon(row, sheetName, i + 1),
@@ -237,87 +244,52 @@ export async function updateItemStatus(
   const itemType = 'dispatchId' in item ? 'відправка' : (item as Passenger | Package).type;
   const phone = 'phone' in item ? (item as Passenger).phone : ('recipientPhone' in item ? (item as Package | ShippingItem).recipientPhone : '');
 
-  const response = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({
-      action: 'updateDriverStatus',
-      driverId: driverName,
-      routeName,
-      itemId,
-      itemType,
-      phone,
-      status,
-      cancelReason,
-    }),
+  const result = await gasPost('updateDriverStatus', {
+    driverId: driverName, routeName, itemId, itemType, phone, status, cancelReason,
   });
-  const text = await response.text();
-  try { return JSON.parse(text); }
-  catch { throw new Error('Помилка оновлення'); }
+  return result;
 }
 
 // ---- Expenses ----
 export async function fetchExpenses(routeName: string): Promise<{ items: ExpenseItem[]; advance: ExpenseAdvance | null }> {
   const sheetName = routeName.replace('Маршрут_', 'Витрати_');
-  const response = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action: 'getExpenses', payload: { sheetName } }),
-  });
-  const text = await response.text();
-  const data = JSON.parse(text);
-  if (data.success) return { items: data.items || [], advance: data.advance || null };
-  throw new Error(data.error || 'Помилка завантаження витрат');
+  const data = await gasPost('getExpenses', { payload: { sheetName } });
+  if (data.success) return { items: (data.items as ExpenseItem[]) || [], advance: (data.advance as ExpenseAdvance) || null };
+  throw new Error((data.error as string) || 'Помилка завантаження витрат');
 }
 
 export async function addExpense(data: Record<string, string>) {
-  const response = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action: 'addExpense', ...data }),
-  });
-  const text = await response.text();
-  try { return JSON.parse(text); }
-  catch { throw new Error('Помилка додавання витрати'); }
+  return gasPost('addExpense', data);
 }
 
 export async function deleteExpense(data: Record<string, string>) {
-  const response = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action: 'deleteExpense', ...data }),
-  });
-  const text = await response.text();
-  try { return JSON.parse(text); }
-  catch { throw new Error('Помилка видалення витрати'); }
+  return gasPost('deleteExpense', data);
 }
 
 // ---- Update advance ----
 export async function updateAdvance(data: Record<string, string>) {
-  const response = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action: 'updateAdvance', ...data }),
-  });
-  const text = await response.text();
-  try { return JSON.parse(text); }
-  catch { throw new Error('Помилка оновлення коштів'); }
+  return gasPost('updateAdvance', data);
 }
 
 // ---- Add new item (passenger or package) ----
 export async function addRouteItem(data: Record<string, string>) {
-  const response = await fetch(CONFIG.API_URL, {
-    method: 'POST',
-    redirect: 'follow',
-    headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify({ action: 'addRouteItem', ...data }),
-  });
-  const text = await response.text();
-  try { return JSON.parse(text); }
-  catch { throw new Error('Помилка додавання'); }
+  return gasPost('addRouteItem', data);
+}
+
+// ---- Search archive for sender/recipient autofill ----
+export interface ArchiveMatch {
+  dateArchive: string;
+  pkgId: string;
+  cliId: string;
+  senderName: string;
+  senderPhone: string;
+  recipientName: string;
+  recipientPhone: string;
+  recipientAddr: string;
+}
+
+export async function searchArchive(query: string): Promise<{ results: ArchiveMatch[]; totalMatches: number }> {
+  const data = await gasPost('searchArchive', { query });
+  if (data.success) return { results: (data.results as ArchiveMatch[]) || [], totalMatches: (data.totalMatches as number) || 0 };
+  throw new Error((data.error as string) || 'Помилка пошуку в архіві');
 }
