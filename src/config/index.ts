@@ -6,7 +6,7 @@ export const CONFIG = {
   // Apps Script Web App — ЄДИНА точка входу (читання + запис).
   // Читання приватної таблиці проксюється через apiGetSheetRows у бекенді.
   API_URL:
-    'https://script.google.com/macros/s/AKfycbyDFpJzq2e7qzQXmy9ecB4C95jchHpjb2hejK5S44Jdq_bbAgJ-pG2c2NwP4zI-MhT25g/exec',
+    'https://script.google.com/macros/s/AKfycbz-ap5vTehYaZl468Q3lK1lMmsaqdJsIPH8vKT2Ms7lG89-ndi-eXJ1hWq8qGBE8oCD6A/exec',
   // Fallback маршрути — використовуються лише якщо Apps Script недоступний.
   // Реальний список повертає GAS getAvailableRoutes (динамічне сканування).
   ROUTES: ['Маршрут_Цюріх', 'Маршрут_Женева', 'Маршрут_Запасний'],
