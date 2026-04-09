@@ -1,6 +1,7 @@
 // ============================================
-// BOTILOGISTICS DRIVERS CRM v2.2
+// BOTILOGISTICS DRIVERS CRM v2.3
 // Єдиний Apps Script для драйверської апки
+// v2.3: Чайові (tips) на картках, Зведення рейсу (buildRouteSummary / saveRouteSummary)
 // v2.2: _meta sync, колонка "Фото посилки" (AY), handleUpdateDriverFieldsSafe
 //       з whitelist + CAS, блок completed→cancelled, обовʼязкова cancelReason
 // ============================================
@@ -59,14 +60,18 @@ var DRIVER_WHITELIST_ROUTE = [
   'Статус оплати',
   'Коментар водія',
   'Примітка',
-  'Фото посилки'
+  'Фото посилки',
+  'Чайові',
+  'Валюта чайових'
 ];
 var DRIVER_WHITELIST_SHIP = [
   'Статус',
   'Форма оплати',
   'Статус оплати',
   'Фото',
-  'Примітка'
+  'Примітка',
+  'Чайові',
+  'Валюта чайових'
 ];
 
 // Кеш відкритих таблиць у межах одного виклику
@@ -141,9 +146,11 @@ var COL = {
   ARCHIVED_BY: 47,      // AV
   ARCHIVE_REASON: 48,   // AW
   ARCHIVE_ID: 49,       // AX
-  PHOTO: 50             // AY — Фото посилки (додано 2026-04, заголовок "Фото посилки")
+  PHOTO: 50,            // AY — Фото посилки (додано 2026-04, заголовок "Фото посилки")
+  TIPS: 51,             // AZ — Чайові
+  TIPS_CUR: 52          // BA — Валюта чайових
 };
-var TOTAL_COLS = 51;
+var TOTAL_COLS = 53;
 
 // ============================================
 // КОЛОНКИ — Відправка (28 колонок)
@@ -176,9 +183,11 @@ var COL_SHIP = {
   DEBT: 24,             // Y
   STATUS: 25,           // Z
   PKG_ID: 26,           // AA
-  NOTE: 27              // AB
+  NOTE: 27,             // AB
+  TIPS: 28,             // AC — Чайові
+  TIPS_CUR: 29          // AD — Валюта чайових
 };
-var TOTAL_COLS_SHIP = 28;
+var TOTAL_COLS_SHIP = 30;
 
 // ============================================
 // КОЛОНКИ — Витрати (26 колонок)
@@ -304,6 +313,10 @@ function doPost(e) {
         return respond(handleRateClient(data));
       case 'searchArchive':
         return respond(searchArchive(payload.query || payload.q || ''));
+      case 'buildRouteSummary':
+        return respond(buildRouteSummary(data));
+      case 'saveRouteSummary':
+        return respond(saveRouteSummary(data));
       default:
         return respond({ success: false, error: 'Невідома дія: ' + action });
     }
@@ -1706,6 +1719,329 @@ function handleUpdateDriverFieldsSafe(data) {
     return { success: true, updated: updated.length, updatedFields: updated, rejected: rejected };
   } catch (err) {
     return { success: false, error: err.toString() };
+  }
+}
+
+// ============================================
+// buildRouteSummary — збирає фінансову інформацію по рейсу
+// ============================================
+// Вхід: { routeName: 'Маршрут_Цюріх', driverName: 'Петро' }
+// Повертає JSON з усіма цифрами (НЕ записує)
+function buildRouteSummary(data) {
+  try {
+    var routeName = String(data.routeName || '').trim();
+    if (!routeName || routeName.indexOf('Маршрут_') !== 0 || isExcludedSheet_(routeName)) {
+      return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
+    }
+
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var CURRENCIES = ['UAH', 'CHF', 'EUR', 'PLN', 'CZK', 'USD'];
+
+    function zeroCur() {
+      var o = {};
+      for (var i = 0; i < CURRENCIES.length; i++) o[CURRENCIES[i]] = 0;
+      return o;
+    }
+
+    var passengers = zeroCur();
+    var packages = zeroCur();
+    var tips = zeroCur();
+    var cashCollected = zeroCur();
+    var cardCollected = zeroCur();
+    var debts = zeroCur();
+
+    // 1. Читаємо Маршрут_*
+    var routeSheet = ss.getSheetByName(routeName);
+    if (routeSheet && routeSheet.getLastRow() >= 2) {
+      var rCols = Math.min(routeSheet.getLastColumn(), TOTAL_COLS);
+      var rData = routeSheet.getRange(2, 1, routeSheet.getLastRow() - 1, rCols).getValues();
+      for (var i = 0; i < rData.length; i++) {
+        var row = rData[i];
+        var itemId = str(row[COL.ITEM_ID]);
+        if (!itemId) continue;
+        var amount = parseFloat(row[COL.AMOUNT]) || 0;
+        var cur = str(row[COL.CURRENCY]) || 'CHF';
+        if (CURRENCIES.indexOf(cur) === -1) cur = 'CHF';
+        var type = str(row[COL.TYPE]).toLowerCase();
+        var payForm = str(row[COL.PAY_FORM]).toLowerCase();
+        var debt = parseFloat(row[COL.DEBT]) || 0;
+        var tipAmt = parseFloat(row[COL.TIPS]) || 0;
+        var tipCur = str(row[COL.TIPS_CUR]) || 'CHF';
+        if (CURRENCIES.indexOf(tipCur) === -1) tipCur = 'CHF';
+
+        if (type === 'пасажир') {
+          passengers[cur] += amount;
+        } else if (type === 'посилка') {
+          packages[cur] += amount;
+        }
+
+        // Розбивка по формі оплати
+        if (payForm === 'готівка' || payForm === 'наложка') {
+          cashCollected[cur] += amount;
+        } else if (payForm === 'безготівка' || payForm === 'картка' || payForm === 'карта') {
+          cardCollected[cur] += amount;
+        }
+
+        if (debt > 0) debts[cur] += debt;
+        if (tipAmt > 0) tips[tipCur] += tipAmt;
+      }
+    }
+
+    // 2. Читаємо Відправка_*
+    var shipping = zeroCur();
+    var shipSheetName = routeName.replace('Маршрут_', 'Відправка_');
+    var shipSheet = ss.getSheetByName(shipSheetName);
+    if (shipSheet && shipSheet.getLastRow() >= 2) {
+      var sCols = Math.min(shipSheet.getLastColumn(), TOTAL_COLS_SHIP);
+      var sData = shipSheet.getRange(2, 1, shipSheet.getLastRow() - 1, sCols).getValues();
+      for (var j = 0; j < sData.length; j++) {
+        var sRow = sData[j];
+        var dispId = str(sRow[COL_SHIP.DISPATCH_ID]);
+        var senderName = str(sRow[COL_SHIP.SENDER_NAME]);
+        if (!dispId && !senderName) continue;
+        var sAmt = parseFloat(sRow[COL_SHIP.AMOUNT]) || 0;
+        var sCur = str(sRow[COL_SHIP.CURRENCY]) || 'CHF';
+        if (CURRENCIES.indexOf(sCur) === -1) sCur = 'CHF';
+        var sPayForm = str(sRow[COL_SHIP.PAY_FORM]).toLowerCase();
+        var sDebt = parseFloat(sRow[COL_SHIP.DEBT]) || 0;
+        var sTip = parseFloat(sRow[COL_SHIP.TIPS]) || 0;
+        var sTipCur = str(sRow[COL_SHIP.TIPS_CUR]) || 'CHF';
+        if (CURRENCIES.indexOf(sTipCur) === -1) sTipCur = 'CHF';
+
+        shipping[sCur] += sAmt;
+
+        if (sPayForm === 'готівка' || sPayForm === 'наложка') {
+          cashCollected[sCur] += sAmt;
+        } else if (sPayForm === 'безготівка' || sPayForm === 'картка' || sPayForm === 'карта') {
+          cardCollected[sCur] += sAmt;
+        }
+
+        if (sDebt > 0) debts[sCur] += sDebt;
+        if (sTip > 0) tips[sTipCur] += sTip;
+      }
+    }
+
+    // 3. Читаємо Витрати_*
+    var expSheetName = routeName.replace('Маршрут_', 'Витрати_');
+    var expSheet = ss.getSheetByName(expSheetName);
+    var expenses = zeroCur();
+    var expensesByCategory = {};
+    var advanceCash = 0, advanceCashCur = 'UAH', advanceCard = 0, advanceCardCur = 'UAH';
+
+    if (expSheet && expSheet.getLastRow() >= 2) {
+      var eCols = Math.min(expSheet.getLastColumn(), TOTAL_COLS_EXP);
+      var eData = expSheet.getRange(2, 1, expSheet.getLastRow() - 1, eCols).getValues();
+
+      // Аванс з першого рядка
+      advanceCash = parseFloat(eData[0][COL_EXP.ADVANCE_CASH]) || 0;
+      advanceCashCur = str(eData[0][COL_EXP.ADVANCE_CASH_CUR]) || 'UAH';
+      advanceCard = parseFloat(eData[0][COL_EXP.ADVANCE_CARD]) || 0;
+      advanceCardCur = str(eData[0][COL_EXP.ADVANCE_CARD_CUR]) || 'UAH';
+
+      for (var k = 0; k < eData.length; k++) {
+        var eRow = eData[k];
+        var expId = str(eRow[COL_EXP.EXP_ID]);
+        var driver = str(eRow[COL_EXP.DRIVER]);
+        if (!expId && !driver) continue;
+
+        var detected = detectCategory_(eRow);
+        if (detected.amount === 0) continue;
+
+        var eCur = str(eRow[COL_EXP.EXPENSE_CUR]) || 'CHF';
+        if (CURRENCIES.indexOf(eCur) === -1) eCur = 'CHF';
+
+        // Чайові з витрат НЕ входять у expenses (вони окремо)
+        if (detected.category === 'tips') continue;
+
+        expenses[eCur] += detected.amount;
+
+        if (!expensesByCategory[detected.category]) {
+          expensesByCategory[detected.category] = { amount: 0, currency: eCur };
+        }
+        expensesByCategory[detected.category].amount += detected.amount;
+      }
+    }
+
+    // 4. Рахуємо підсумки
+    var income = zeroCur();
+    var toReturn = zeroCur();
+    for (var ci = 0; ci < CURRENCIES.length; ci++) {
+      var c = CURRENCIES[ci];
+      income[c] = passengers[c] + packages[c] + shipping[c];
+      // Здати в касу = готівка зібрана - витрати + аванс готівкою (по тій самій валюті)
+      toReturn[c] = cashCollected[c] - expenses[c];
+    }
+    // Додаємо аванс готівкою до toReturn у відповідній валюті
+    if (advanceCash > 0 && CURRENCIES.indexOf(advanceCashCur) !== -1) {
+      toReturn[advanceCashCur] += advanceCash;
+    }
+
+    return {
+      success: true,
+      summary: {
+        routeName: routeName,
+        passengers: passengers,
+        packages: packages,
+        shipping: shipping,
+        tips: tips,
+        income: income,
+        cashCollected: cashCollected,
+        cardCollected: cardCollected,
+        debts: debts,
+        advanceCash: advanceCash,
+        advanceCashCur: advanceCashCur,
+        advanceCard: advanceCard,
+        advanceCardCur: advanceCardCur,
+        expenses: expenses,
+        expensesByCategory: expensesByCategory,
+        toReturn: toReturn
+      }
+    };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// ============================================
+// saveRouteSummary — записує зведення рейсу в MARHRUT і FINANCE
+// ============================================
+// Вхід: { routeName, driverName, summary: {...} }
+function saveRouteSummary(data) {
+  try {
+    var routeName = String(data.routeName || '').trim();
+    if (!routeName || routeName.indexOf('Маршрут_') !== 0) {
+      return { success: false, error: 'Невалідний маршрут: ' + (routeName || '(пусто)') };
+    }
+    var driverName = data.driverName || '';
+    var summary = data.summary;
+    if (!summary) return { success: false, error: 'Немає summary' };
+
+    var now = new Date();
+    var dateStr = Utilities.formatDate(now, 'Europe/Kiev', 'yyyy-MM-dd HH:mm:ss');
+
+    // Будуємо рядок для Зведення рейсів (MARHRUT, 53 колонки)
+    // Заголовки: RTE_ID, Дата рейсу, Місто, AUTO_ID, Номер авто, Водій,
+    // Пас.UAH, Пас.CHF, Пас.EUR, Пас.PLN, Пас.CZK, Пас.USD,
+    // Пос.UAH, Пос.CHF, Пос.EUR, Пос.PLN, Пос.CZK, Пос.USD,
+    // Відпр.UAH, Відпр.CHF, Відпр.EUR, Відпр.PLN, Відпр.CZK, Відпр.USD,
+    // Чайові UAH, Чайові CHF, Чайові EUR,
+    // Дохід UAH, Дохід CHF, Дохід EUR, Дохід PLN, Дохід CZK, Дохід USD,
+    // Аванс готівка, Вал авансу готівка, Аванс картка, Вал авансу картка,
+    // Витр.UAH, Витр.CHF, Витр.EUR, Витр.PLN, Витр.CZK,
+    // Прибуток UAH, Прибуток CHF, Прибуток EUR, Прибуток PLN,
+    // Прибуток CZK, Прибуток USD,
+    // Статус, Закрив, Дата закриття, Лог змін, Примітка
+    var CUR = ['UAH', 'CHF', 'EUR', 'PLN', 'CZK', 'USD'];
+
+    function g(obj, c) { return (obj && obj[c]) ? obj[c] : 0; }
+
+    var rowData = [
+      routeName,                         // 0 RTE_ID
+      summary.dateTrip || '',            // 1 Дата рейсу
+      summary.city || '',                // 2 Місто
+      '',                                // 3 AUTO_ID
+      summary.autoNum || '',             // 4 Номер авто
+      driverName,                        // 5 Водій
+    ];
+    // 6-11: Пас по валютах
+    for (var pi = 0; pi < CUR.length; pi++) rowData.push(g(summary.passengers, CUR[pi]));
+    // 12-17: Пос по валютах
+    for (var ki = 0; ki < CUR.length; ki++) rowData.push(g(summary.packages, CUR[ki]));
+    // 18-23: Відпр по валютах
+    for (var si = 0; si < CUR.length; si++) rowData.push(g(summary.shipping, CUR[si]));
+    // 24-26: Чайові UAH, CHF, EUR
+    rowData.push(g(summary.tips, 'UAH'));
+    rowData.push(g(summary.tips, 'CHF'));
+    rowData.push(g(summary.tips, 'EUR'));
+    // 27-32: Дохід по валютах
+    for (var di = 0; di < CUR.length; di++) rowData.push(g(summary.income, CUR[di]));
+    // 33-36: Аванс
+    rowData.push(summary.advanceCash || 0);
+    rowData.push(summary.advanceCashCur || 'UAH');
+    rowData.push(summary.advanceCard || 0);
+    rowData.push(summary.advanceCardCur || 'UAH');
+    // 37-41: Витр по валютах (UAH,CHF,EUR,PLN,CZK)
+    rowData.push(g(summary.expenses, 'UAH'));
+    rowData.push(g(summary.expenses, 'CHF'));
+    rowData.push(g(summary.expenses, 'EUR'));
+    rowData.push(g(summary.expenses, 'PLN'));
+    rowData.push(g(summary.expenses, 'CZK'));
+    // 42-47: Прибуток по валютах
+    for (var ri = 0; ri < CUR.length; ri++) {
+      rowData.push(g(summary.income, CUR[ri]) - g(summary.expenses, CUR[ri]));
+    }
+    // 48-52: Статус, Закрив, Дата, Лог, Примітка
+    rowData.push('Зведено');
+    rowData.push(driverName);
+    rowData.push(dateStr);
+    rowData.push('');
+    rowData.push('');
+
+    // Записуємо в MARHRUT."Зведення рейсів"
+    var ssMar = SpreadsheetApp.openById(SS.MARHRUT);
+    _writeSummaryRow_(ssMar, 'Зведення рейсів', routeName, rowData);
+
+    // Записуємо в FINANCE."Зведення рейсів" (56 колонок = 53 + Борги UAH/CHF/EUR)
+    var finRowData = rowData.slice(); // copy
+    // Додаємо борги перед статусом (вставляємо на позиції 48, зсуваючи статус/закрив/дата)
+    // Фактично FINANCE має 56 колонок: перші 48 = як MARHRUT, потім 3 борги, потім статус/закрив/дата/лог/примітка
+    var finRow = rowData.slice(0, 48); // до Статусу
+    finRow.push(g(summary.debts, 'UAH'));
+    finRow.push(g(summary.debts, 'CHF'));
+    finRow.push(g(summary.debts, 'EUR'));
+    finRow.push('Зведено');
+    finRow.push(driverName);
+    finRow.push(dateStr);
+    finRow.push('');
+    finRow.push('');
+
+    try {
+      var ssFin = openSS_('FINANCE');
+      _writeSummaryRow_(ssFin, 'Зведення рейсів', routeName, finRow);
+    } catch (e) {
+      // Не критично — основний запис вже пройшов
+    }
+
+    // Аудит
+    writeAuditLog_({
+      who: driverName, role: 'driver', action: 'saveRouteSummary',
+      table: 'MARHRUT', sheet: 'Зведення рейсів', recordId: routeName,
+      note: 'Зведення збережено'
+    });
+    _touchMeta_('Зведення рейсів');
+
+    return { success: true, message: 'Зведення збережено' };
+  } catch (err) {
+    return { success: false, error: err.toString() };
+  }
+}
+
+// Допоміжна: пишемо/оновлюємо рядок зведення по RTE_ID
+function _writeSummaryRow_(ss, sheetName, rteId, rowData) {
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return;
+
+  var lastRow = sheet.getLastRow();
+  var rowNum = -1;
+
+  if (lastRow >= 2) {
+    var ids = sheet.getRange(2, 1, lastRow - 1, 1).getValues();
+    for (var i = 0; i < ids.length; i++) {
+      if (String(ids[i][0]) === rteId) {
+        rowNum = i + 2;
+        break;
+      }
+    }
+  }
+
+  if (rowNum === -1) {
+    // Новий рядок
+    sheet.appendRow(rowData);
+  } else {
+    // Оновлюємо поклітинно
+    for (var c = 0; c < rowData.length; c++) {
+      sheet.getRange(rowNum, c + 1).setValue(rowData[c]);
+    }
   }
 }
 

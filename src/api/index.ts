@@ -1,5 +1,5 @@
 import { CONFIG } from '../config';
-import type { Route, ShippingRoute, Passenger, Package, ShippingItem, RouteItem, ExpenseItem, ExpenseAdvance } from '../types';
+import type { Route, ShippingRoute, Passenger, Package, ShippingItem, RouteItem, ExpenseItem, ExpenseAdvance, RouteSummary } from '../types';
 
 // POST-запит до GAS з таймаутом 30 сек
 async function gasPost(action: string, data: Record<string, unknown>): Promise<Record<string, unknown>> {
@@ -67,7 +67,7 @@ const C = {
   TTN: 25, PKG_DESC: 26, PKG_WEIGHT: 27, AMOUNT: 28, CURRENCY: 29,
   DEPOSIT: 30, DEPOSIT_CURRENCY: 31, PAY_FORM: 32, PAY_STATUS: 33,
   DEBT: 34, PAY_NOTE: 35, STATUS: 36, STATUS_CRM: 37, TAG: 38,
-  NOTE: 43, SMS_NOTE: 44,
+  NOTE: 43, SMS_NOTE: 44, TIPS: 51, TIPS_CUR: 52,
 };
 
 // Column indices for Відправка sheets
@@ -78,6 +78,7 @@ const CS = {
   INTERNAL_NUM: 14, WEIGHT: 15, DESCRIPTION: 16, PHOTO: 17,
   AMOUNT: 18, CURRENCY: 19, DEPOSIT: 20, DEPOSIT_CURRENCY: 21, PAY_FORM: 22,
   PAY_STATUS: 23, DEBT: 24, STATUS: 25, PKG_ID: 26, NOTE: 27,
+  TIPS: 28, TIPS_CUR: 29,
 };
 
 function val(row: string[], idx: number): string {
@@ -111,6 +112,8 @@ function buildCommon(row: string[], sheetName: string, rowNum: number) {
     tag: val(row, C.TAG),
     note: val(row, C.NOTE),
     smsNote: val(row, C.SMS_NOTE),
+    tips: val(row, C.TIPS),
+    tipsCurrency: val(row, C.TIPS_CUR),
     sheet: sheetName,
     _statusKey: '',
     _sourceRoute: undefined as string | undefined,
@@ -224,6 +227,8 @@ export async function fetchShippingItems(sheetName: string): Promise<ShippingIte
       status: val(row, CS.STATUS),
       pkgId: val(row, CS.PKG_ID),
       note: val(row, CS.NOTE),
+      tips: val(row, CS.TIPS),
+      tipsCurrency: val(row, CS.TIPS_CUR),
       sheet: sheetName,
       _statusKey: '',
       _sourceRoute: undefined as string | undefined,
@@ -292,4 +297,27 @@ export async function searchArchive(query: string): Promise<{ results: ArchiveMa
   const data = await gasPost('searchArchive', { query });
   if (data.success) return { results: (data.results as ArchiveMatch[]) || [], totalMatches: (data.totalMatches as number) || 0 };
   throw new Error((data.error as string) || 'Помилка пошуку в архіві');
+}
+
+// ---- Route Summary ----
+export async function buildRouteSummaryApi(routeName: string, driverName: string): Promise<RouteSummary> {
+  const data = await gasPost('buildRouteSummary', { routeName, driverName });
+  if (data.success) return data.summary as RouteSummary;
+  throw new Error((data.error as string) || 'Помилка побудови зведення');
+}
+
+export async function saveRouteSummaryApi(routeName: string, driverName: string, summary: RouteSummary): Promise<{ success: boolean }> {
+  const data = await gasPost('saveRouteSummary', { routeName, driverName, summary });
+  if (data.success) return { success: true };
+  throw new Error((data.error as string) || 'Помилка збереження зведення');
+}
+
+// ---- Update driver fields (tips, etc.) ----
+export async function updateDriverFieldsSafe(
+  routeName: string,
+  itemId: string,
+  fields: Record<string, string | number>,
+  driverName: string
+) {
+  return gasPost('updateDriverFieldsSafe', { routeName, itemId, fields, driverName });
 }

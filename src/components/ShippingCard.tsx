@@ -6,6 +6,7 @@ import {
 import type { ShippingItem, ItemStatus } from '../types';
 import { useApp } from '../store/useAppStore';
 import { updateItemStatus } from '../api';
+import { TipsButton } from './TipsButton';
 
 interface Props {
   item: ShippingItem;
@@ -35,6 +36,8 @@ function derivePayStatus(payForm?: string): { label: string; cls: string } {
 export function ShippingCard({ item, index, onEdit }: Props) {
   const { getStatus, setStatus, driverName, isUnifiedView, showToast } = useApp();
   const [expanded, setExpanded] = useState(false);
+  const [localTips, setLocalTips] = useState(item.tips);
+  const [localTipsCur, setLocalTipsCur] = useState(item.tipsCurrency);
 
   const rawStatus = item._statusKey ? getStatus(item._statusKey) : 'pending';
   const status: ItemStatus = rawStatus in stLabel ? rawStatus : 'pending';
@@ -82,6 +85,13 @@ export function ShippingCard({ item, index, onEdit }: Props) {
               </div>
             )}
           </div>
+          <TipsButton
+            tips={localTips}
+            tipsCurrency={localTipsCur}
+            routeName={sheetName}
+            itemId={item.dispatchId}
+            onUpdated={(t, c) => { setLocalTips(t); setLocalTipsCur(c); }}
+          />
           <span className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold ${sl.c}`}>
             {sl.t}
           </span>
