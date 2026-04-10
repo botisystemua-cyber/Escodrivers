@@ -17,8 +17,8 @@ function loadHiddenCols(): Set<string> {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [driverName, setDriverNameState] = useState(() => localStorage.getItem('driverName') || '');
-  const [currentScreen, setCurrentScreen] = useState<'login' | 'routes' | 'list' | 'expenses'>('login');
+  const [driverName, setDriverNameState] = useState(() => localStorage.getItem('driverName') || 'Водій');
+  const [currentScreen, setCurrentScreen] = useState<'login' | 'routes' | 'list' | 'expenses'>('routes');
   const [currentSheet, setCurrentSheet] = useState('');
   const [isUnifiedView, setIsUnifiedView] = useState(false);
   const [statuses, setStatuses] = useState<Record<string, ItemStatus>>({});
@@ -34,7 +34,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const lastManual = parseInt(localStorage.getItem('driverThemeManualAt') || '0', 10);
     const hour = new Date().getHours();
     const isNight = hour >= 20 || hour < 7;
-    // Auto night mode if no manual override in last 12h
     if (isNight && Date.now() - lastManual > 12 * 3600 * 1000) return 'lone-wolf';
     return saved || 'top-driver';
   });
@@ -43,11 +42,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Auto-switch to lone-wolf at 20:00, back to top-driver at 07:00
   useEffect(() => {
     const check = () => {
       const lastManual = parseInt(localStorage.getItem('driverThemeManualAt') || '0', 10);
-      if (Date.now() - lastManual < 12 * 3600 * 1000) return; // respect manual override for 12h
+      if (Date.now() - lastManual < 12 * 3600 * 1000) return;
       const hour = new Date().getHours();
       const isNight = hour >= 20 || hour < 7;
       setThemeState((prev) => {
